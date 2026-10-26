@@ -6,7 +6,10 @@
     "Environment": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "id": {
           "type": "string"

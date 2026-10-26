@@ -119,6 +119,23 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 	if q.Source != "human" && q.Source != "agent" && q.Source != "ci" {
 		return domain.Run{}, domain.E("invalid", "source must be human, agent or ci")
 	}
+	if e := q.Plan.Validate(); e != nil {
+		return domain.Run{}, e
+	}
+	if e := domain.CheckID(q.RequestID); e != nil {
+		return domain.Run{}, e
+	}
+	if old, e := m.Store.ByRequest(q.RequestID); e == nil {
+		if old.Plan.Hash != q.Plan.Hash || old.Source != q.Source {
+			return domain.Run{}, domain.E("conflict", "request_id already refers to another plan or source")
+		}
+		return old, nil
+	} else {
+		var d *domain.Error
+		if !errors.As(e, &d) || d.Code != "not_found" {
+			return domain.Run{}, e
+		}
+	}
 	if e := m.Validate(q.Plan); e != nil {
 		return domain.Run{}, e
 	}

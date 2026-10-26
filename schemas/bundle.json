@@ -40,7 +40,10 @@
     "Bundle": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "run": {
           "$ref": "#/$defs/Run"
@@ -63,7 +66,10 @@
     "Environment": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "id": {
           "type": "string"
@@ -220,7 +226,10 @@
     "Plan": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "spec": {
           "$ref": "#/$defs/Spec"
@@ -287,7 +296,10 @@
     "Run": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "id": {
           "type": "string"
@@ -351,7 +363,10 @@
     "SoftwareVersion": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "id": {
           "type": "string"
@@ -383,7 +398,10 @@
     "Spec": {
       "properties": {
         "schema_version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
         },
         "name": {
           "type": "string"

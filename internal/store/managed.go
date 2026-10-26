@@ -10,6 +10,20 @@ import (
 	"time"
 )
 
+func (s *Store) ByRequest(id string) (domain.Run, error) {
+	var r domain.Run
+	var body string
+	e := s.DB.QueryRow("SELECT body FROM runs WHERE request_id=?", id).Scan(&body)
+	if errors.Is(e, sql.ErrNoRows) {
+		return r, domain.E("not_found", "request not found")
+	}
+	if e != nil {
+		return r, e
+	}
+	e = json.Unmarshal([]byte(body), &r)
+	return r, e
+}
+
 func (s *Store) CreateManaged(p domain.Plan, request, source string) (domain.Run, error) {
 	r := domain.NewRun(p, source)
 	r.RequestID = request

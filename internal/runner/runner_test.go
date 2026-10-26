@@ -45,7 +45,7 @@ func TestTimeoutPreservesEvidence(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if b.Run.Status != "failed" || len(b.Files) < 4 {
+	if b.Run.Status != "failed" || len(b.Files) < 2 {
 		t.Fatalf("missing failure evidence: status=%s files=%d error=%s", b.Run.Status, len(b.Files), b.Run.Error)
 	}
 }

@@ -52,7 +52,7 @@ type Machine struct {
 	Network     string `json:"network"`
 }
 type Environment struct {
-	SchemaVersion string            `json:"schema_version"`
+	SchemaVersion string            `json:"schema_version" jsonschema:"enum=1.0"`
 	ID            string            `json:"id"`
 	Name          string            `json:"name"`
 	Kind          string            `json:"kind"`
@@ -82,7 +82,7 @@ func (e Environment) Validate() error {
 }
 
 type SoftwareVersion struct {
-	SchemaVersion string `json:"schema_version"`
+	SchemaVersion string `json:"schema_version" jsonschema:"enum=1.0"`
 	ID            string `json:"id"`
 	Filesystem    string `json:"filesystem"`
 	Label         string `json:"label"`
@@ -116,7 +116,7 @@ type Matrix struct {
 	IODepth []int `json:"iodepth"`
 }
 type Spec struct {
-	SchemaVersion string            `json:"schema_version"`
+	SchemaVersion string            `json:"schema_version" jsonschema:"enum=1.0"`
 	Name          string            `json:"name"`
 	Kind          string            `json:"kind"`
 	Workload      Workload          `json:"workload"`
@@ -190,7 +190,7 @@ type Point struct {
 	Repeat  int    `json:"repeat"`
 }
 type Plan struct {
-	SchemaVersion string          `json:"schema_version"`
+	SchemaVersion string          `json:"schema_version" jsonschema:"enum=1.0"`
 	Spec          Spec            `json:"spec"`
 	Environment   Environment     `json:"environment"`
 	Version       SoftwareVersion `json:"version"`
@@ -267,7 +267,8 @@ type Metric struct {
 
 func (m Metric) Validate() error {
 	units := map[string]string{"throughput": "bytes/s", "iops": "ops/s", "clat_p99": "ns", "metadata_rate": "ops/s"}
-	if units[m.Name] != m.Unit || m.Operation == "" || math.IsNaN(m.Value) || math.IsInf(m.Value, 0) || m.Value < 0 {
+	unit, known := units[m.Name]
+	if !known || unit != m.Unit || m.Operation == "" || math.IsNaN(m.Value) || math.IsInf(m.Value, 0) || m.Value < 0 {
 		return E("invalid", "invalid metric name/unit/value")
 	}
 	return nil
@@ -290,7 +291,7 @@ type Attempt struct {
 	ResultState string    `json:"result_state"`
 }
 type Run struct {
-	SchemaVersion string    `json:"schema_version"`
+	SchemaVersion string    `json:"schema_version" jsonschema:"enum=1.0"`
 	ID            string    `json:"id"`
 	RequestID     string    `json:"request_id"`
 	Source        string    `json:"source"`

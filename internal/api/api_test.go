@@ -205,4 +205,9 @@ func TestCancelAndRestart(t *testing.T) {
 	if _, e = service.New(s, config); e == nil {
 		t.Fatal("accepted second manager")
 	}
+	m.Config.MaxBytes = 1
+	again, e = m.Start(service.StartRequest{Plan: pending.Plan, RequestID: "crashed", Source: "ci", Executor: "local"})
+	if e != nil || again.ID != pending.ID {
+		t.Fatal("policy change broke idempotent retrieval", e)
+	}
 }

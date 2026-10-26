@@ -20,7 +20,7 @@ type File struct {
 	Data   []byte `json:"data"`
 }
 type Bundle struct {
-	SchemaVersion string     `json:"schema_version"`
+	SchemaVersion string     `json:"schema_version" jsonschema:"enum=1.0"`
 	Run           domain.Run `json:"run"`
 	Files         []File     `json:"files"`
 }

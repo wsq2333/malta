@@ -1,6 +1,6 @@
 # Agent skills
 
-状态：目录预留与契约规划，尚无可安装的 skill；CLI 实现后再添加 `SKILL.md` 和经过验证的命令示例。
+状态：`malta-benchmark/SKILL.md` 已实现并验证 local 执行路径，可复制到 Agent 的 skill 目录使用。`malta-analysis` 与 Kubernetes 全链路验收留待后续阶段。
 
 Malta 的 skill 随项目版本发布，面向外部 Agent，复用标准 CLI。它不承载另一套 Runner，也不在测试 Pod 中运行模型推理。
 

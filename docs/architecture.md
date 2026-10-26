@@ -1,6 +1,6 @@
 # 架构与语言选型
 
-状态：建议方案，尚未实现。Malta 定位为 Agent 增强与管理的分布式文件系统性能对照平台；CLI 与 Agent 操作契约、Kubernetes 单 Pod 执行纳入首版设计，多客户端与高级分析逐步扩展。
+状态：S0–S4 已实现本地闭环；本文保留完整目标架构，Kubernetes 与后续能力尚未实现。实际命令与边界以 [CLI 文档](cli.md) 和 [实现记录](implementation.md) 为准。Malta 定位为 Agent 增强与管理的分布式文件系统性能对照平台；CLI 与 Agent 操作契约、Kubernetes 单 Pod 执行纳入首版设计，多客户端与高级分析逐步扩展。
 
 ## 1. 语言选择
 

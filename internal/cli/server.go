@@ -10,6 +10,7 @@ import (
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/service"
 	"github.com/wsq2333/malta/internal/store"
+	"github.com/wsq2333/malta/web"
 	"io"
 	"net"
 	"net/http"
@@ -243,9 +244,4 @@ func serverCommands(root *cobra.Command, o *Options) {
 	run.AddCommand(logs)
 	root.AddCommand(serve, run)
 }
-func frontendHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, "<!doctype html><title>Malta</title><h1>Malta API is ready</h1><p>The React interface is delivered in S4.</p>")
-	})
-}
+func frontendHandler() http.Handler { return web.Handler() }

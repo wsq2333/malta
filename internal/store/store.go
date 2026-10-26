@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/wsq2333/malta/internal/artifact"
 	"github.com/wsq2333/malta/internal/domain"
+	"github.com/wsq2333/malta/internal/engine/fio"
 	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"
@@ -174,6 +175,20 @@ func (s *Store) Import(b artifact.Bundle) error {
 	}
 	if e := VerifyEvidence(b); e != nil {
 		return e
+	}
+	if b.Run.Plan.Spec.Kind == "data" {
+		for _, trial := range b.Run.Trials {
+			if trial.Status != "succeeded" {
+				continue
+			}
+			raw, e := artifact.Get(b, trial.Point.ID+"/measure.json")
+			if e != nil {
+				return e
+			}
+			if e = fio.VerifyPlan(raw, b.Run.Plan, trial.Point); e != nil {
+				return e
+			}
+		}
 	}
 	if !domain.Terminal(b.Run.Status) {
 		return domain.E("invalid", "only terminal result bundles can be imported")
