@@ -14,7 +14,9 @@ import (
 )
 
 const Schema = "1.0"
-const Version = "0.1.0-dev"
+
+var Version = "0.1.0-dev"
+var Revision = "development"
 
 type Error struct {
 	Code    string `json:"code"`

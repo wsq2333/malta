@@ -1,6 +1,6 @@
 # Server and Runner images
 
-Build the embedded frontend, then Linux binaries into `build/output/`:
+Recommended: run `python3 scripts/release.py --with-kubectl` to prepare all image inputs, including dependency notices. The underlying binary build is:
 
 ```sh
 (cd web && pnpm install --frozen-lockfile && pnpm build)
@@ -12,8 +12,7 @@ done
 
 The Server additionally needs `kubectl-linux-<arch>` (1.35.0). Download from
 `https://dl.k8s.io/release/v1.35.0/bin/linux/<arch>/kubectl`, verify against
-`kubectl-checksums.json`, and set executable permissions. S7's release script
-will automate these steps.
+`kubectl-checksums.json`, and set executable permissions. `python3 scripts/release.py --with-kubectl` automates binary, UI, license and kubectl preparation.
 
 ```sh
 docker build -f build/docker/Dockerfile.server -t malta-server:local .

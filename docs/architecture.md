@@ -1,6 +1,6 @@
 # 架构与语言选型
 
-状态：S0–S4 已实现本地闭环；本文保留完整目标架构，Kubernetes 与后续能力尚未实现。实际命令与边界以 [CLI 文档](cli.md) 和 [实现记录](implementation.md) 为准。Malta 定位为 Agent 增强与管理的分布式文件系统性能对照平台；CLI 与 Agent 操作契约、Kubernetes 单 Pod 执行纳入首版设计，多客户端与高级分析逐步扩展。
+状态：S0–S7 已实现本地与 Kubernetes 单客户端闭环；高级分析、多客户端和生产环境认证仍属后续范围。实际命令与边界以 [CLI 文档](cli.md) 和 [实现记录](implementation.md) 为准。Malta 定位为 Agent 增强与管理的分布式文件系统性能对照平台；CLI 与 Agent 操作契约、Kubernetes 单 Pod 执行纳入首版设计，多客户端与高级分析逐步扩展。
 
 ## 1. 语言选择
 
@@ -82,7 +82,7 @@ EnvironmentSnapshot 分别描述云厂商/区域/实例类型或物理机厂商/
 
 ## 4. 执行与导入一致性
 
-运行状态规划为 `pending → preparing → running → succeeded / failed / cancelled / interrupted`。任意阶段的失败都保留诊断信息；启动恢复时，无法确认完成的旧运行标记为 interrupted，不自动重跑写入负载。
+运行状态为 `pending → preparing → running → succeeded / failed / cancelled / interrupted`。任意阶段的失败都保留诊断信息；启动恢复时，本地未完成运行标记为 interrupted；Kubernetes 接管原 Job/Attempt。两者均不自动重放压测。
 
 Runner 记录工具退出码、超时、实际时长和每个 Trial 的完整性。read 测试的数据准备与预热单独计时，不混入测量窗口。每次运行使用目标路径下独立子目录，只清理自己创建且记录在案的文件。
 
@@ -96,9 +96,9 @@ Runner 记录工具退出码、超时、实际时长和每个 Trial 的完整性
 
 SQLite WAL 允许读写并行，但同时只有一个 writer，且不适用于网络文件系统。因此数据库放在服务所在机器的本地磁盘，不能放到被测分布式文件系统上；多客户端通过服务访问数据。[SQLite WAL 文档](https://www.sqlite.org/wal.html)
 
-生产目标是 Linux，开发环境可使用 macOS。规划 server/runner 两类容器镜像，Agent 运行时与模型推理不放进压测进程。Kubernetes 用 Job 创建 Runner Pod，复用已有 PVC/CSI；测试路径、只读计划和结果路径分离。服务和图表查询尽量与压测隔离，无法隔离时记录其资源占用。
+生产目标是 Linux，开发环境可使用 macOS。提供 server/runner 两类容器镜像，Agent 运行时与模型推理不放进压测进程。Kubernetes 用 Job 创建 Runner Pod，复用已有 PVC/CSI；测试路径、只读计划和结果路径分离。服务和图表查询尽量与压测隔离，无法隔离时记录其资源占用。
 
-单 Pod 路径进入 MVP。记录资源 requests/limits、实际节点和镜像版本；结果确认持久化之后才安排 Pod 清理。多 Pod 同步与聚合单独实现。目录职责见 [Kubernetes 规划](../deploy/kubernetes/README.md) 和 [镜像规划](../build/docker/README.md)。
+单 Pod 路径进入 MVP。记录资源 requests/limits、实际节点和镜像版本；结果确认持久化之后才安排 Pod 清理。多 Pod 同步与聚合单独实现。目录职责见 [Kubernetes 部署](../deploy/kubernetes/README.md) 和 [镜像构建](../build/docker/README.md)。
 
 当出现多个服务实例、持续并发导入或 SQLite 写入瓶颈时再引入 PostgreSQL；原始文件超出本地磁盘管理能力时引入对象存储。迁移需要数据和事务语义验证，不承诺只换连接串即可完成。
 
@@ -121,7 +121,7 @@ API 使用 `/api/v1` 命名空间。先在 OpenAPI 中定义契约，再生成�
 
 Agent 从首版通过项目 skill 调用 CLI，完成计划、提交、查询、等待、取消和比较。`--format json` 与 `--non-interactive` 是稳定契约，stdout 不混入诊断日志。执行受项目配置的目标环境、目录与额度约束；已授权范围内自动运行，越界返回可识别错误。API 提供指标定义、单位、缺失和可比性原因，不能只返回图表数组。
 
-测试执行与分析 skill 分离，均放在仓库 `skills/` 中随版本发布；当前只有目录约定，待 CLI 实现后再编写可安装 skill。流程与验收见 [skills 规划](../skills/README.md)。
+测试管理 skill 已在 `skills/malta-benchmark` 实现，含会话恢复与证据报告规则；专用分析 skill 与模型适配层按 [第三方 Agent 方向](third-party-agents.md)扩展。流程与验收见 [skills](../skills/README.md)。
 
 分析报告独立于测量结果，记录模型/工具版本、输入运行 ID、证据引用、观测事实、推断和待验证建议。后续接入 MCP 或其他 Agent 协议时复用查询服务，具体 SDK 与模型供应商暂不绑定。
 

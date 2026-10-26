@@ -23,6 +23,9 @@ func workerCommand() *cobra.Command {
 		if err := r.Validate(); err != nil {
 			return err
 		}
+		if r.MaltaVersion != domain.Version {
+			return domain.E("unsupported", "worker Malta version differs from controller-issued run")
+		}
 		if r.Attempt.Executor != "kubernetes" || r.Plan.Target != "/bench" {
 			return domain.E("invalid", "worker requires a Kubernetes run targeting /bench")
 		}

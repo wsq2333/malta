@@ -56,6 +56,17 @@ schema, a durable session helper, and scoped local/Kubernetes/recovery/reporting
 skill references. Session recovery does not submit work. Black-box acceptance
 uses only the published CLI and skill assets, with no database access.
 
+## S7 — release candidate and installation
+
+Added deterministic RC packaging for Linux amd64/arm64 and macOS arm64, embedded
+UI, dependency notices/checksums, pinned kubectl fetching, container license inputs,
+CI artifacts, installation/upgrade instructions and an explicit support matrix.
+Apache-2.0 was selected by the owner. The RC archive passed a fresh-directory
+installation, real fio smoke and Agent protocol acceptance on the SSH host; RC
+images passed the isolated Kubernetes lifecycle suite. Browser acceptance now
+shows only configured executors. Worker/controller version mismatch is rejected
+before I/O. Third-party Agent evolution is described in its own design document.
+
 ## Remaining scope
 
-S7 prepares RC delivery. Production CSI/node-failure and external model acceptance remain environment-specific gates. The server retains a serial queue and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.
+Production CSI/node-failure and external model acceptance remain environment-specific gates. The server retains a serial queue and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.

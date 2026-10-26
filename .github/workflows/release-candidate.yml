@@ -1,0 +1,41 @@
+name: Release candidate
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: RC version (0.1.x)
+        required: true
+        default: 0.1.0-rc.1
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - name: Test and package
+        env:
+          RC_VERSION: ${{ inputs.version }}
+        run: |
+          python3 scripts/release.py --version "$RC_VERSION" --with-kubectl
+          go test -race ./...
+          go vet ./...
+      - name: Build both container images
+        run: |
+          docker build -f build/docker/Dockerfile.server -t malta-server:rc .
+          docker build -f build/docker/Dockerfile.runner -t malta-runner:rc .
+          docker run --rm malta-server:rc version
+          docker run --rm --entrypoint fio malta-runner:rc --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: malta-release-candidate
+          path: release/

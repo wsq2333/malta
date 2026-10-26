@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Destructive fault tests ONLY in a disposable malta-test* namespace/cluster."""
-import argparse,json,pathlib,subprocess,time,urllib.request,urllib.error,uuid
+import argparse,json,os,pathlib,subprocess,time,urllib.request,urllib.error,uuid
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--kubeconfig',required=True);p.add_argument('--namespace',required=True)
 p.add_argument('--malta',required=True);p.add_argument('--token-file',required=True)
@@ -81,6 +81,18 @@ try:
   job=json.loads(kubectl('get','job',final['attempt']['job_name'],'-o','json'));assert job['metadata']['uid']==final['attempt']['job_uid']
  finally:kubectl('exec','deployment/malta','--','chmod','0755','/var/lib/malta/artifacts')
  print('PASS persistence failure retains Job',flush=True)
+ helper=root/'skills/malta-benchmark/scripts/session.py'
+ session=out/'agent-session.json'
+ def agent(action,*args):
+  raw=subprocess.check_output(['python3',str(helper),action,'--malta',a.malta,'--session',str(session),*args],env=dict(os.environ,MALTA_TOKEN=token));return json.loads(raw)['data']
+ r=agent('start','--server','http://127.0.0.1:19483','--plan',str(out/'plan.json'),'--request-id','agent-'+uuid.uuid4().hex[:12],'--executor','kubernetes')
+ saved=json.loads(session.read_text());saved['run_id']=None;session.write_text(json.dumps(saved))
+ assert agent('resume')['id']==r['id']
+ final=wait(r);assert final['status']=='succeeded',final
+ assert agent('compare','--baseline',r['id'])['comparable']
+ save('agent-final',final)
+ print('PASS public Agent session helper on Kubernetes',flush=True)
+
  save('summary',{'passed':True,'cluster':a.cluster,'node':a.node,'storage':'single-node hostPath fixture; not CSI certification'})
 finally:
  if pf is not None:pf.terminate();pf.wait(timeout=10)

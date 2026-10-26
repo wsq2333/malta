@@ -5,6 +5,8 @@ ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --chmod=755 build/output/malta-linux-${TARGETARCH} /usr/local/bin/malta
 COPY --chmod=755 build/output/kubectl-linux-${TARGETARCH} /usr/local/bin/kubectl
+COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /usr/share/doc/malta/
+COPY build/output/licenses /usr/share/doc/malta/licenses
 USER 10001:10001
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/malta"]

@@ -61,7 +61,7 @@ func NewRoot(out, errOut io.Writer) *cobra.Command {
 	f.StringVar(&o.Token, "token", os.Getenv("MALTA_TOKEN"), "API token (prefer MALTA_TOKEN environment variable)")
 	f.StringVar(&o.DataDir, "data-dir", ".malta", "Local metadata and artifact directory")
 	r.AddCommand(&cobra.Command{Use: "version", Short: "Show CLI and schema versions", RunE: func(c *cobra.Command, args []string) error {
-		return Output(c.OutOrStdout(), map[string]string{"version": domain.Version, "schema_version": domain.Schema})
+		return Output(c.OutOrStdout(), map[string]string{"version": domain.Version, "schema_version": domain.Schema, "revision": domain.Revision})
 	}})
 	r.AddCommand(workerCommand(), kubernetesCommand(), capabilitiesCommand(o))
 	executionCommands(r, o)

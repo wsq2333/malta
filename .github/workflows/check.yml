@@ -13,7 +13,7 @@ jobs:
           version: 11.25.0
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '24.19.0'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile && pnpm build && pnpm test
@@ -21,3 +21,8 @@ jobs:
       - run: go vet ./...
       - run: go build -trimpath -o bin/malta ./cmd/malta
       - run: go run ./scripts/genschema && git diff --exit-code schemas/
+      - run: python3 scripts/release.py --version 0.1.0-rc.1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: malta-rc
+          path: release/

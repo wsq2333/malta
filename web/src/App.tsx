@@ -116,6 +116,7 @@ export function App() {
     [jsonInput, setJSONInput] = useState(""),
     [requestId, setRequestId] = useState(""),
     [executor, setExecutor] = useState("local"),
+    [executors, setExecutors] = useState<string[]>([]),
     [baselineName, setBaselineName] = useState(""),
     [modalError, setModalError] = useState(""),
     [logs, setLogs] = useState<unknown>(null);
@@ -167,13 +168,18 @@ export function App() {
       api<Environment[]>("/environments"),
       api<Version[]>("/versions"),
       api<Baseline[]>("/baselines"),
+      api<{ executors: string[] }>("/capabilities"),
     ])
-      .then(([r, e, v, b]) => {
+      .then(([r, e, v, b, caps]) => {
         if (valid) {
           setRuns(r);
           setEnvironments(e);
           setVersions(v);
           setBaselines(b);
+          setExecutors(caps.executors);
+          setExecutor((old) =>
+            caps.executors.includes(old) ? old : caps.executors[0] || "",
+          );
           setSelected((old) =>
             old ? r.find((x) => x.id === old.id) || null : null,
           );
@@ -425,7 +431,8 @@ export function App() {
           <button className="connection" onClick={() => openModal("token")}>
             <span className="connection-dot" />
             <span>
-              本地执行后端<small>v0.1 · 单工作进程</small>
+              可用执行器
+              <small>{executors.join(" / ") || "读取中"} · 串行队列</small>
             </span>
             <Settings2 size={16} />
           </button>
@@ -1262,7 +1269,7 @@ export function App() {
               malta<span className="brand-dot">.</span>{" "}
               <span>Agent 增强的性能对照平台</span>
             </span>
-            <span>服务与测试 Pod 分离 · Kubernetes 执行器预留至 S5</span>
+            <span>服务与测试 Pod 分离 · 统一性能证据与基线</span>
           </footer>
         </div>
       </main>
@@ -1278,7 +1285,7 @@ export function App() {
             modal === "token"
               ? "API 连接设置"
               : modal === "start"
-                ? "发起本地测试"
+                ? "发起性能测试"
                 : modal === "baseline"
                   ? "保存性能基线"
                   : modal === "environment"
@@ -1331,10 +1338,13 @@ export function App() {
                       value={executor}
                       onChange={(e) => setExecutor(e.target.value)}
                     >
-                      <option value="local">Local · 服务节点</option>
-                      <option value="kubernetes">
-                        Kubernetes · 独立 Runner Job
-                      </option>
+                      {executors.map((name) => (
+                        <option key={name} value={name}>
+                          {name === "local"
+                            ? "Local · 服务节点"
+                            : "Kubernetes · 独立 Runner Job"}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 )}
@@ -1370,7 +1380,7 @@ export function App() {
                 {modal === "start" && (
                   <div className="alert success">
                     <Play size={16} />
-                    执行后端：local · 单工作进程 · 服务端校验资源预算
+                    执行后端：{executor} · 串行队列 · 服务端校验资源预算
                   </div>
                 )}
               </>

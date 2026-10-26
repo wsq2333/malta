@@ -6,7 +6,7 @@ Malta is an agent-enhanced platform for orchestrating, managing, and comparing d
 
 Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共用一套 CLI、测试定义和结果契约，完成“制定计划 → 执行测试 → 管理运行 → 对照基线 → 分析证据”。名称取自地中海岛国马耳他。
 
-> **当前范围：S0–S6 已实现。** 本地与 Kubernetes Job 执行、CLI/API、结果存储、基线比较及 React UI 已接通。服务 Pod 与测试 Pod 独立，通过结果 PVC 回传证据。Agent 能力发现、会话恢复和 skill 已补齐；S7 正在准备 RC 交付；当前不是生产高可用服务。
+> **当前范围：S0–S7 代码已实现，进入 v0.1 RC 验证。** 本地与 Kubernetes Job 执行、CLI/API、结果存储、基线比较及 React UI 已接通。服务 Pod 与测试 Pod 独立，通过结果 PVC 回传证据。Agent 能力发现、会话恢复和 skill 已补齐；提供可复现构建、安装升级文档与 Apache-2.0 许可证。生产 CSI、固定实验室性能与外部模型行为仍需专项验收。
 
 ## 已实现的能力
 
@@ -83,8 +83,8 @@ benchmarks/data/            smoke 与 lab 负载
 benchmarks/metadata/        元数据导入条件
 environments/              环境与版本示例
 skills/malta-benchmark/     可安装的本地测试管理 skill
-deploy/kubernetes/         S5 服务与 Runner Job 部署预留
-build/docker/               S5 镜像构建预留
+deploy/kubernetes/         服务 Deployment、Runner Job 与参数化部署
+build/docker/               独立 Server/Runner Dockerfile 与固定校验和
 scripts/                    schema 生成与端到端 smoke
 testdata/                  真实工具输出 fixture
 docs/                      架构、方法、路线图、实现证据
@@ -116,4 +116,17 @@ MALTA_BIN="$PWD/bin/malta" MALTA_TEST_FIO=/path/to/fio \
 - [Agent 测试 skill](skills/malta-benchmark/SKILL.md)
 - [Kubernetes 部署预留](deploy/kubernetes/README.md)
 
-后续顺序：S5 独立 Kubernetes Runner → S6 集群 Agent 全链路验收与分析扩展 → S7 发布验收。当前 UI 历史与趋势窗口最多 500 条；CLI/API 支持历史分页。元数据原生执行、多客户端协调、自动瓶颈归因、对象存储与多租户仍在后续范围。
+后续优先级：[第三方 Agent 扩展](docs/third-party-agents.md)中的只读分析、服务端权限/预算、MCP 接口与观测关联。当前 UI 历史与趋势窗口最多 500 条；CLI/API 支持历史分页。元数据原生执行、多客户端协调、自动瓶颈归因、对象存储与多租户仍在后续范围。
+
+## RC 安装与发布
+
+[安装、配置和升级](docs/install.md) · [支持矩阵](docs/support-matrix.md) ·
+[验证记录](docs/validation-s5-s7.md) · [第三方 Agent 方向](docs/third-party-agents.md)
+
+```sh
+python3 scripts/release.py --version 0.1.0-rc.1 --with-kubectl
+```
+
+生成 Linux amd64/arm64、macOS arm64 的内嵌 UI 二进制、skill、文档、依赖许可证
+和 SHA-256 校验和。脚本只生成本地制品，不自动发布到 GitHub 或镜像仓库。
+项目采用 [Apache-2.0](LICENSE)。

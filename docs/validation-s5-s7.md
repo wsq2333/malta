@@ -40,3 +40,33 @@ filesystem has been certified by these functional checks.
 - This exercises the interface an external agent uses. No third-party language
   model was invoked; provider-specific reasoning and behavior acceptance is still
   required before unattended use with that provider.
+
+## S7
+
+- Apache-2.0 selected by the project owner; official license, notice and dependency
+  notices included. Packaging collects licenses for linked Go modules and shipped
+  frontend runtime packages.
+- Go 1.26.5, Node 24.19.0, pnpm 11.25.0: repeated frontend builds and each of
+  Linux amd64, Linux arm64 and Darwin arm64 binaries matched byte-for-byte.
+  Deterministic tar/gzip metadata and SHA-256 checksums are generated. Container
+  base images are pinned but apt dependency resolution is not claimed reproducible.
+- Fresh archive extraction on the SSH host verified checksums and ran the real-fio
+  CLI smoke and public Agent session contract successfully. Evidence is retained
+  at `/tmp/malta-s5-s7-20261026/rc-smoke` and `rc-agent`.
+- RC Server/Runner images passed the same real Kubernetes lifecycle and fault suite
+  as S5; artifacts are at `/private/tmp/malta-rc-integration`; final version checks and the Kubernetes
+  Agent session helper are covered in `malta-rc-final-integration`.
+- Browser acceptance on the existing real-data preview confirmed capability-based
+  executor choices and preserved baseline/trend rendering. Stale local-only labels
+  were removed during acceptance.
+- Final Linux amd64 test binaries (all ten packages) passed again over SSH,
+  including atomic claim, bundle/SQLite crash-window recovery, capabilities and
+  worker version rejection tests.
+- Version mismatch between controller and worker now fails before claiming an
+  attempt or performing I/O; covered by a focused CLI regression test.
+- CI builds/test/packages artifacts but does not publish a GitHub release or push
+  container images. Local validation is not a claim that remote GitHub CI ran.
+
+Remaining external gates: a real CSI/multi-node RWX environment, node-loss fencing,
+fixed-hardware performance qualification, and provider-specific LLM behavior
+acceptance. RC code and functional tests are complete within the tested scope.

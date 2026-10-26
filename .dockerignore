@@ -3,3 +3,7 @@
 build/*
 !build/output/
 !build/docker/
+
+!LICENSE
+!NOTICE
+!THIRD_PARTY_NOTICES.md
