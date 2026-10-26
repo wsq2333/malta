@@ -1,0 +1,14 @@
+# 未来统一应用配置的模板，当前 CLI 不会自动加载此文件。
+# 现阶段请将各项显式传入对应 CLI flag，格式可随后续实现调整。
+server:
+  listen: "127.0.0.1:8080"       # --listen
+  data_dir: .malta              # --data-dir
+  token_env: MALTA_TOKEN        # 当前支持的环境变量，不在此保存真实 Token
+local_runner:
+  allow_targets:                # 每项通过 --allow-target 传入
+    - /tmp/malta-data
+  fio: /usr/local/bin/fio       # --fio，需使用支持的版本
+  max_bytes: 1073741824         # --max-bytes
+  run_timeout: 1h               # --run-timeout
+kubernetes:
+  executor_config: config/parameter/executor.yaml # --kubernetes-config

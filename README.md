@@ -82,6 +82,10 @@ schemas/                    生成的 JSON Schema
 benchmarks/data/            smoke 与 lab 负载
 benchmarks/metadata/        元数据导入条件
 environments/              环境与版本示例
+config/                    本地配置，仅提交指定示例和说明
+  deploy/                  部署与测试集群 kubeconfig
+  parameter/               应用与执行器 YAML 参数
+  llm/                     未来模型连接与凭证模板
 skills/malta-benchmark/     可安装的本地测试管理 skill
 deploy/kubernetes/         服务 Deployment、Runner Job 与参数化部署
 build/docker/               独立 Server/Runner Dockerfile 与固定校验和
@@ -108,6 +112,7 @@ MALTA_BIN="$PWD/bin/malta" MALTA_TEST_FIO=/path/to/fio \
 
 ## 文档与后续路线
 
+- [本地配置与示例](config/README.md)（真实连接、参数和密钥默认不入 Git）
 - [CLI 与运行说明](docs/cli.md)
 - [架构与语言选型](docs/architecture.md)
 - [测试方法与可比性](docs/benchmark-methodology.md)

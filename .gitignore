@@ -14,3 +14,14 @@ coverage.out
 
 /build/output/
 /release/
+
+# Local configuration is private by default; only these reviewed examples are tracked.
+/config/**
+!/config/README.md
+!/config/deploy/
+!/config/parameter/
+!/config/llm/
+!/config/deploy/kubeconfig.example.yaml
+!/config/parameter/executor.example.yaml
+!/config/parameter/application.example.yaml
+!/config/llm/providers.example.yaml
