@@ -26,7 +26,7 @@ func Execute(ctx context.Context, r domain.Run, out string, o Options) (result d
 	if e := r.Plan.Validate(); e != nil {
 		return r, e
 	}
-	if r.Plan.Spec.Kind != "data" {
+	if r.Plan.Spec.Kind != "data" && r.Plan.Spec.Kind != "scenario" {
 		return r, domain.E("unsupported", "exec supports fio data plans only")
 	}
 	if r.Plan.Spec.Workload.CacheState == "cold-verified" {
@@ -41,13 +41,14 @@ func Execute(ctx context.Context, r domain.Run, out string, o Options) (result d
 	if o.MaxBytes <= 0 {
 		o.MaxBytes = 1 << 30
 	}
-	var bytes int64
-	for _, p := range r.Plan.Trials {
-		bytes += r.Plan.Spec.Workload.FileSizeBytes * int64(r.Plan.Spec.Workload.FilesPerJob) * int64(p.NumJobs)
-		if bytes < 0 || bytes > o.MaxBytes {
-			return r, domain.E("invalid", "planned data exceeds --max-bytes budget")
-		}
+	bytes, seconds := r.Plan.Budget()
+	if bytes < 0 || bytes > o.MaxBytes {
+		return r, domain.E("invalid", "planned data exceeds --max-bytes budget")
 	}
+	if r.Plan.Spec.Scenario != nil && time.Duration(seconds)*time.Second >= o.Timeout {
+		return r, domain.E("invalid", "measurement leaves no preparation time within timeout")
+	}
+
 	target, e := filepath.EvalSymlinks(r.Plan.Target)
 	if e != nil {
 		return r, domain.E("invalid", "target must already exist: "+e.Error())
@@ -134,6 +135,10 @@ func Execute(ctx context.Context, r domain.Run, out string, o Options) (result d
 	}
 	if e = domain.Write(filepath.Join(out, "data-paths.json"), map[string]string{"created_directory": dataDir, "cleanup": "retained; remove this dedicated directory after inspection"}); e != nil {
 		return result, e
+	}
+	if result.Plan.Spec.Scenario != nil {
+		err := executeScenario(ctx, &result, out, dataDir, o.Fio, update)
+		return result, err
 	}
 	for _, p := range result.Plan.Trials {
 		t := domain.Trial{Point: p, Status: "preparing", StartedAt: time.Now().UTC(), Metrics: []domain.Metric{}}

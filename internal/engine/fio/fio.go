@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wsq2333/malta/internal/domain"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -19,6 +20,9 @@ func Args(p domain.Plan, point domain.Point, dir string, prepare bool) []string 
 	a := []string{"--name=malta", "--directory=" + dir, "--filename_format=job.$jobnum.$filenum", "--filesize=" + strconv.FormatInt(w.FileSizeBytes, 10), "--size=" + strconv.FormatInt(w.FileSizeBytes*int64(w.FilesPerJob), 10), fmt.Sprintf("--nrfiles=%d", w.FilesPerJob), fmt.Sprintf("--numjobs=%d", point.NumJobs), "--group_reporting=1", "--output-format=json+", "--eta=never", "--randrepeat=1", fmt.Sprintf("--randseed=%d", w.Seed)}
 	if prepare {
 		return append(a, "--rw=write", fmt.Sprintf("--bs=%d", w.BlockSizeBytes), "--ioengine=psync", "--iodepth=1", "--end_fsync=1")
+	}
+	if point.StageID != "" {
+		a = append(a, "--write_iops_log="+filepath.Join(dir, "measure"), "--per_job_logs=0", "--log_avg_msec=100", "--log_unix_epoch=1")
 	}
 	a = append(a, "--rw="+w.Operation, fmt.Sprintf("--bs=%d", w.BlockSizeBytes), "--ioengine="+w.IOEngine, fmt.Sprintf("--iodepth=%d", point.IODepth), fmt.Sprintf("--runtime=%d", w.RuntimeSeconds), fmt.Sprintf("--ramp_time=%d", w.WarmupSeconds), "--time_based=1", "--allow_file_create=0", fmt.Sprintf("--direct=%d", boolInt(w.Direct)), fmt.Sprintf("--fsync=%d", w.FsyncEvery))
 	if w.Operation == "randrw" {

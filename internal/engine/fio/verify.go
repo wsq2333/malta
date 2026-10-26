@@ -22,7 +22,7 @@ func VerifyPlan(raw []byte, p domain.Plan, point domain.Point) error {
 	actual := v.Jobs[0].Options
 	for _, arg := range Args(p, point, "unused", false) {
 		key, value, ok := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
-		if !ok || key == "directory" || key == "output-format" || key == "eta" {
+		if !ok || key == "directory" || key == "write_iops_log" || key == "output-format" || key == "eta" {
 			continue
 		}
 		if actual[key] != value {

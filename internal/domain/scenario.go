@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"time"
 )
 
 const ScenarioSchema = "scenario/v1alpha1"
@@ -147,4 +148,27 @@ func (p Plan) Budget() (int64, int64) {
 		}
 	}
 	return bytes, seconds
+}
+
+// Require a shared observed interval covering at least half of the configured measurement.
+func ValidateStageWindow(stage Stage, trials []Trial) error {
+	if len(trials) != len(stage.Workloads) {
+		return E("invalid", "incomplete scenario stage")
+	}
+	var start, end time.Time
+	for _, t := range trials {
+		if t.Status != "succeeded" || !t.FinishedAt.After(t.StartedAt) {
+			return E("invalid", "incomplete observed measurement window")
+		}
+		if start.IsZero() || t.StartedAt.After(start) {
+			start = t.StartedAt
+		}
+		if end.IsZero() || t.FinishedAt.Before(end) {
+			end = t.FinishedAt
+		}
+	}
+	if end.Sub(start) < time.Duration(stage.RuntimeSeconds)*time.Second/2 {
+		return E("invalid", "parallel measurement windows overlap less than 50% of requested runtime")
+	}
+	return nil
 }
