@@ -28,3 +28,15 @@ claims. Exact supported combinations and remaining lab gates are recorded here.
 Production acceptance still needs the actual CSI, benchmark PVC, node/hardware
 inventory, network topology and fixed workload budgets. No CSI driver or distributed
 filesystem has been certified by these functional checks.
+
+## S6
+
+- Full Go race regression passed; OpenAPI parsed and executor enums checked.
+- Skill validator passed; session helper syntax/help checked.
+- Public CLI black-box acceptance passed on the SSH development host with real
+  fio: lost response/run-ID recovery, duplicate start, changed-executor conflict,
+  wait timeout, comparison, and resume of an absent request without starting I/O.
+  Evidence: `/tmp/malta-s5-s7-20261026/s6-agent-acceptance/acceptance.json`.
+- This exercises the interface an external agent uses. No third-party language
+  model was invoked; provider-specific reasoning and behavior acceptance is still
+  required before unattended use with that provider.

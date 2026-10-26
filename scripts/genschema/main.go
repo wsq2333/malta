@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	for name, v := range map[string]any{"spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}, "bundle": artifact.Bundle{}, "baseline": domain.Baseline{}, "comparison": domain.Comparison{}} {
+	for name, v := range map[string]any{"spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}, "bundle": artifact.Bundle{}, "baseline": domain.Baseline{}, "comparison": domain.Comparison{}, "capabilities": domain.Capabilities{}} {
 		r := new(jsonschema.Reflector)
 		s := r.Reflect(v)
 		s.ID = jsonschema.ID("https://malta.local/schemas/" + name + ".json")

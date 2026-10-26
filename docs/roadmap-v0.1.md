@@ -1,6 +1,6 @@
 # Malta v0.1 代码实现路线图
 
-状态：S0–S5 已完成代码与功能验证；S6–S7 正在实现。具体范围与验证见 [实现记录](implementation.md)。本文将 README 的 M0–M2 展开为可逐步验收的代码交付，既有技术选型维持 Go + TypeScript/React。
+状态：S0–S6 已完成代码与协议验证；S7 正在实现，外部模型行为验收仍需选定模型与环境。具体范围与验证见 [实现记录](implementation.md)。本文将 README 的 M0–M2 展开为可逐步验收的代码交付，既有技术选型维持 Go + TypeScript/React。
 
 ## 1. 第一版交付目标
 

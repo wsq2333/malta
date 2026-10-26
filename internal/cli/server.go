@@ -137,7 +137,7 @@ func serverCommands(root *cobra.Command, o *Options) {
 	f.DurationVar(&timeout, "run-timeout", time.Hour, "Total per-run deadline")
 	f.StringVar(&kubeConfig, "kubernetes-config", "", "Kubernetes executor config JSON (enables Jobs)")
 	run := &cobra.Command{Use: "run"}
-	run.AddCommand(historyCommand(o))
+	run.AddCommand(historyCommand(o), lookupCommand(o))
 	var planFile, request, source, executor string
 	start := &cobra.Command{Use: "start", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		if o.Server == "" {

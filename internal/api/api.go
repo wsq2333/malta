@@ -64,6 +64,15 @@ func Handler(m *service.Manager, token string, frontend http.Handler) http.Handl
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		send(w, 200, map[string]string{"status": "ok", "version": domain.Version}, nil)
 	})
+	mux.HandleFunc("GET /api/v1/capabilities", func(w http.ResponseWriter, r *http.Request) { send(w, 200, m.Capabilities(), nil) })
+	mux.HandleFunc("GET /api/v1/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if e := domain.CheckID(r.PathValue("id")); e != nil {
+			send(w, 400, nil, e)
+			return
+		}
+		v, e := s.ByRequest(r.PathValue("id"))
+		send(w, 200, v, e)
+	})
 	for _, kind := range []string{"environment", "version"} {
 		kind := kind
 		base := "/api/v1/" + kind + "s"

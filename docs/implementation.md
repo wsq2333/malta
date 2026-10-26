@@ -49,6 +49,13 @@ and cleanup only after persistence. UI supports executor selection and Attempt d
 Remote Linux real-fio tests and an isolated Kubernetes 1.35.0 lifecycle/fault suite
 passed. See [validation details](validation-s5-s7.md).
 
+## S6 — provider-neutral Agent workflow
+
+Added capabilities and request lookup to the public CLI/API, versioned capability
+schema, a durable session helper, and scoped local/Kubernetes/recovery/reporting
+skill references. Session recovery does not submit work. Black-box acceptance
+uses only the published CLI and skill assets, with no database access.
+
 ## Remaining scope
 
-S6 completes the Agent interface and workflows; S7 prepares RC delivery. Production CSI/node-failure and external model acceptance remain environment-specific gates. The server retains a serial queue and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.
+S7 prepares RC delivery. Production CSI/node-failure and external model acceptance remain environment-specific gates. The server retains a serial queue and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.

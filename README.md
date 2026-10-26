@@ -6,7 +6,7 @@ Malta is an agent-enhanced platform for orchestrating, managing, and comparing d
 
 Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共用一套 CLI、测试定义和结果契约，完成“制定计划 → 执行测试 → 管理运行 → 对照基线 → 分析证据”。名称取自地中海岛国马耳他。
 
-> **当前范围：S0–S5 已实现。** 本地与 Kubernetes Job 执行、CLI/API、结果存储、基线比较及 React UI 已接通。服务 Pod 与测试 Pod 独立，通过结果 PVC 回传证据。Agent 工作流和 RC 交付正在 S6–S7 完善；当前不是生产高可用服务。
+> **当前范围：S0–S6 已实现。** 本地与 Kubernetes Job 执行、CLI/API、结果存储、基线比较及 React UI 已接通。服务 Pod 与测试 Pod 独立，通过结果 PVC 回传证据。Agent 能力发现、会话恢复和 skill 已补齐；S7 正在准备 RC 交付；当前不是生产高可用服务。
 
 ## 已实现的能力
 
@@ -19,7 +19,7 @@ Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共�
 | CLI 与 API | 计划、前台执行、托管运行、查询/等待/取消/日志、导入导出、登记、基线与比较 |
 | 基线 | 显式固定成功运行；逐项检查可比性；重复中位数、Min/Max、变化率、零基线与缺失值处理 |
 | Web UI | 白底薄荷绿；数据/元数据、版本、环境、运行详情、对照和日期趋势、已测并发曲线、证据下载 |
-| Agent | JSON envelope、退出码、稳定 request-id、本地测试管理 skill；与人工共用业务规则 |
+| Agent | JSON envelope、能力发现、退出码、request-id 查询与会话恢复、本地/Kubernetes skill；与人工共用业务规则 |
 
 “最高已测性能”是指定矩阵和测量窗口内的结果，不代表绝对系统极限。跨硬件实验会显示条件差异，不能直接归因于版本回归。P99 展示为各次实验 P99 的中位数，不冒充合并分布的 P99。
 

@@ -62,10 +62,27 @@ bin/malta --server http://127.0.0.1:8080 run cancel RUN_ID
 
 `--server` also routes registry, import/export, history, baseline and comparison commands through the API. Use `MALTA_TOKEN` for both server and client. Binding beyond loopback requires a token; remote deployments must provide TLS through a proxy or SSH tunnel. A browser cannot make cross-origin mutations. OpenAPI is in `api/openapi.yaml`.
 
-One local worker executes all resource groups serially in S3. This conservative first implementation prevents concurrent tests on the server from interfering. A resource lock also excludes competing foreground runs using the same target and group. The server revalidates canonical target paths and byte/duration budgets. Use dedicated directories owned by the benchmark operator; concurrently replacing directories or mounts is outside the local executor's trust boundary.
+A single queue serializes both local and Kubernetes runs. This conservative first implementation prevents concurrent tests on the server from interfering. A resource lock also excludes competing foreground runs using the same target and group. The server revalidates canonical target paths and byte/duration budgets. Use dedicated directories owned by the benchmark operator; concurrently replacing directories or mounts is outside the local executor's trust boundary.
 
-The server durably records request IDs before queueing. Identical retries return the original run; a changed plan/source conflicts. `wait` timeout or disconnection leaves the run running. `logs --follow` is NDJSON of complete, bounded snapshots (64 KiB per stderr file), not incremental log lines. Terminal execution can briefly have `result_state=collecting`; evidence is durable only at `complete`. Persistence failures remain visible as `failed`.
+The server durably records request IDs before queueing. Identical retries return the original run; a changed plan/source/executor conflicts. `wait` timeout or disconnection leaves the run running. `logs --follow` is NDJSON of complete, bounded snapshots (64 KiB per stderr file), not incremental log lines. Terminal execution can briefly have `result_state=collecting`; evidence is durable only at `complete`. Persistence failures remain visible as `failed`.
 
-The data directory allows only one manager. On restart, unfinished queued/running/collecting work becomes `interrupted`, with no automatic replay and no PID-based killing of unrelated processes. Graceful shutdown cancels the active process group; Linux children additionally receive a parent-death signal. Keep the service and fio in a process supervisor/cgroup for forced-stop containment. Raw work files are retained for interrupted-run diagnosis. New attempts require a new, intentionally chosen request ID.
+The data directory allows only one manager. On restart, unfinished local queued/running/collecting work becomes `interrupted`, with no automatic replay and no PID-based killing of unrelated processes. Graceful shutdown cancels the active process group; Linux children additionally receive a parent-death signal. Keep the service and fio in a process supervisor/cgroup for forced-stop containment. Raw work files are retained for interrupted-run diagnosis. New attempts require a new, intentionally chosen request ID.
 
-Install or copy the scoped [malta-benchmark skill](../skills/malta-benchmark/SKILL.md) into your Agent's skill directory. It only documents implemented local commands. Kubernetes execution remains S5.
+Install or copy the scoped [malta-benchmark skill](../skills/malta-benchmark/SKILL.md) into your Agent's skill directory. It covers both executors and session recovery. Kubernetes configuration and deployment are described in [the deployment guide](../deploy/kubernetes/README.md).
+
+## Discovery and request recovery (S6)
+
+```sh
+malta version
+malta --server "$MALTA_SERVER" capabilities
+malta --server "$MALTA_SERVER" run lookup --request-id experiment-001
+python3 skills/malta-benchmark/scripts/session.py resume --session experiment.json
+```
+
+Capabilities reports the configured executors, byte/deadline limits and feature
+availability. Without `--server` it describes offline CLI capabilities. Request
+lookup is read-only and returns `not_found` for unknown requests. On a lost start
+response, lookup first; retries use the same plan, source, executor and request ID.
+Kubernetes server restart reconciles the original Job and does not replay I/O.
+The skill session helper checkpoints before submission and locks its session file;
+new conversations can resume without knowing any database paths or tables.

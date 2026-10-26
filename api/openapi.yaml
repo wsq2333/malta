@@ -3,20 +3,51 @@ info:
   title: Malta API
   version: 0.1.0
   description: Single-instance run management and evidence-based benchmark comparison.
-    Kubernetes execution is reserved for S5. Bearer authentication is required when
-    a server token is configured. One local worker runs serially; logs are bounded
+    Local and Kubernetes executors share a serial queue. Bearer authentication is required when
+    a server token is configured. Logs are bounded
     snapshots.
 servers:
 - url: /api/v1
 security:
 - bearerAuth: []
 paths:
+  /capabilities:
+    get:
+      responses:
+        '200':
+          description: Version, schema, configured executors and enforced server budgets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data: {$ref: '../schemas/capabilities.json'}
+  /requests/{id}:
+    get:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Existing run for this request ID; never starts a run
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data: {$ref: '../schemas/run.json'}
+        '404':
+          description: No matching request
   /health:
     get:
       security: []
       responses:
         '200':
-          description: Server version and available executors
+          description: Server health and version
         default:
           description: Structured error
           content:
@@ -227,6 +258,7 @@ paths:
                   type: string
                   enum:
                   - local
+                  - kubernetes
       responses:
         '202':
           description: Submitted or existing logical Run

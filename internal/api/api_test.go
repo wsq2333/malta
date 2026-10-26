@@ -139,6 +139,26 @@ func TestManagedAPI(t *testing.T) {
 	if r.ID != second.ID {
 		t.Fatal("request duplicated")
 	}
+	if status, found := call(t, server.URL, "GET", "/api/v1/requests/idempotency", "test-token", nil); status != 200 {
+		t.Fatal(status, string(found))
+	} else {
+		var recovered domain.Run
+		if e = json.Unmarshal(found, &recovered); e != nil || recovered.ID != r.ID {
+			t.Fatal("lookup changed identity")
+		}
+	}
+	if status, caps := call(t, server.URL, "GET", "/api/v1/capabilities", "test-token", nil); status != 200 {
+		t.Fatal(status)
+	} else {
+		var v domain.Capabilities
+		if e = json.Unmarshal(caps, &v); e != nil || !v.Features["request_lookup"] || v.Mode != "server" {
+			t.Fatal(string(caps))
+		}
+	}
+	if status, _ := call(t, server.URL, "GET", "/api/v1/requests/missing", "test-token", nil); status != 404 {
+		t.Fatal(status)
+	}
+
 	q.Source = "agent"
 	if status, _ = call(t, server.URL, "POST", "/api/v1/runs", "test-token", q); status != 409 {
 		t.Fatal("request conflict not rejected", status)
