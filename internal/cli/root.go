@@ -66,6 +66,7 @@ func NewRoot(out, errOut io.Writer) *cobra.Command {
 	r.AddCommand(nativeCommand(), workerCommand(), kubernetesCommand(), capabilitiesCommand(o))
 	executionCommands(r, o)
 	dataCommands(r, o)
+	caseCommands(r, o)
 	serverCommands(r, o)
 	wrapExecutionErrors(r)
 	return r

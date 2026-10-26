@@ -324,6 +324,7 @@ type Attempt struct {
 	ResultState string    `json:"result_state"`
 }
 type Run struct {
+	CaseRef       *CaseRef  `json:"case_ref,omitempty"`
 	SchemaVersion string    `json:"schema_version" jsonschema:"enum=1.0,enum=scenario/v1alpha1"`
 	ID            string    `json:"id"`
 	RequestID     string    `json:"request_id"`
@@ -347,6 +348,15 @@ func NewRun(p Plan, source string) Run {
 	return Run{SchemaVersion: p.SchemaVersion, ID: ID("run"), Source: source, Plan: p, Status: "pending", CreatedAt: now, UpdatedAt: now, MaltaVersion: Version, Trials: []Trial{}, Attempt: Attempt{ID: ID("attempt"), Status: "pending", Executor: "local", ResultState: "pending"}}
 }
 func (r Run) Validate() error {
+	if r.CaseRef != nil {
+		if e := CheckID(r.CaseRef.ID); e != nil {
+			return e
+		}
+		if r.CaseRef.Revision < 1 {
+			return E("invalid", "case revision must be positive")
+		}
+	}
+
 	if r.SchemaVersion != r.Plan.SchemaVersion || (r.SchemaVersion != Schema && r.SchemaVersion != ScenarioSchema) {
 		return E("invalid", "unsupported run schema")
 	}

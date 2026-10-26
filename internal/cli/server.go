@@ -138,16 +138,29 @@ func serverCommands(root *cobra.Command, o *Options) {
 	f.StringVar(&kubeConfig, "kubernetes-config", "", "Kubernetes executor config JSON (enables Jobs)")
 	run := &cobra.Command{Use: "run"}
 	run.AddCommand(historyCommand(o), lookupCommand(o))
-	var planFile, request, source, executor string
+	var planFile, request, source, executor, caseID string
+	var caseRevision int
 	start := &cobra.Command{Use: "start", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		if o.Server == "" {
 			return domain.E("invalid", "run start requires --server")
 		}
 		var p domain.Plan
-		if e := domain.Read(planFile, &p); e != nil {
-			return e
+		q := service.StartRequest{RequestID: request, Source: source, Executor: executor}
+		if caseID != "" {
+			if caseRevision < 1 {
+				return domain.E("invalid", "--case-revision must be positive")
+			}
+			q.CaseRef = &domain.CaseRef{ID: caseID, Revision: caseRevision}
+		} else {
+			if c.Flags().Changed("case-revision") {
+				return domain.E("invalid", "--case-revision requires --case")
+			}
+			if e := domain.Read(planFile, &p); e != nil {
+				return e
+			}
+			q.Plan = p
 		}
-		v, e := remote(o, "POST", "/api/v1/runs", service.StartRequest{Plan: p, RequestID: request, Source: source, Executor: executor})
+		v, e := remote(o, "POST", "/api/v1/runs", q)
 		if e != nil {
 			return e
 		}
@@ -158,7 +171,10 @@ func serverCommands(root *cobra.Command, o *Options) {
 	f.StringVar(&request, "request-id", "", "Stable ID reused on retry")
 	f.StringVar(&source, "source", "human", "human, agent or ci")
 	f.StringVar(&executor, "executor", "local", "Execution backend (local or kubernetes)")
-	_ = start.MarkFlagRequired("plan")
+	f.StringVar(&caseID, "case", "", "Saved case ID")
+	f.IntVar(&caseRevision, "case-revision", 0, "Pinned saved case revision")
+	start.MarkFlagsOneRequired("plan", "case")
+	start.MarkFlagsMutuallyExclusive("plan", "case")
 	_ = start.MarkFlagRequired("request-id")
 	run.AddCommand(start)
 	get := &cobra.Command{Use: "get RUN_ID", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {

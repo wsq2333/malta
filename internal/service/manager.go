@@ -35,10 +35,11 @@ type Manager struct {
 	unlock func()
 }
 type StartRequest struct {
-	Plan      domain.Plan `json:"plan"`
-	RequestID string      `json:"request_id"`
-	Source    string      `json:"source"`
-	Executor  string      `json:"executor"`
+	CaseRef   *domain.CaseRef `json:"case_ref,omitempty"`
+	Plan      domain.Plan     `json:"plan"`
+	RequestID string          `json:"request_id"`
+	Source    string          `json:"source"`
+	Executor  string          `json:"executor"`
 }
 
 func New(s *store.Store, c Config) (*Manager, error) {
@@ -128,6 +129,16 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 	if q.Source != "human" && q.Source != "agent" && q.Source != "ci" {
 		return domain.Run{}, domain.E("invalid", "source must be human, agent or ci")
 	}
+	if q.CaseRef != nil {
+		if q.Plan.SchemaVersion != "" {
+			return domain.Run{}, domain.E("invalid", "provide either plan or case_ref")
+		}
+		v, e := m.Store.CaseVersion(q.CaseRef.ID, q.CaseRef.Revision)
+		if e != nil {
+			return domain.Run{}, e
+		}
+		q.Plan = v.Plan
+	}
 	if e := q.Plan.Validate(); e != nil {
 		return domain.Run{}, e
 	}
@@ -135,7 +146,7 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 		return domain.Run{}, e
 	}
 	if old, e := m.Store.ByRequest(q.RequestID); e == nil {
-		if old.Plan.Hash != q.Plan.Hash || old.Source != q.Source || old.Attempt.Executor != q.Executor {
+		if domain.Hash(old.CaseRef) != domain.Hash(q.CaseRef) || old.Plan.Hash != q.Plan.Hash || old.Source != q.Source || old.Attempt.Executor != q.Executor {
 			return domain.Run{}, domain.E("conflict", "request_id already refers to another plan or source")
 		}
 		return old, nil
@@ -148,7 +159,7 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 	if e := m.validate(q.Plan, q.Executor); e != nil {
 		return domain.Run{}, e
 	}
-	return m.Store.CreateManaged(q.Plan, q.RequestID, q.Source, q.Executor)
+	return m.Store.CreateManagedFromCase(q.Plan, q.RequestID, q.Source, q.Executor, q.CaseRef)
 }
 func (m *Manager) Cancel(id string) (domain.Run, error) {
 	m.mu.Lock()

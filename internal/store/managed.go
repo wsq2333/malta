@@ -25,11 +25,17 @@ func (s *Store) ByRequest(id string) (domain.Run, error) {
 }
 
 func (s *Store) CreateManaged(p domain.Plan, request, source string, executor ...string) (domain.Run, error) {
+	backend := "local"
+	if len(executor) > 0 {
+		backend = executor[0]
+	}
+	return s.CreateManagedFromCase(p, request, source, backend, nil)
+}
+func (s *Store) CreateManagedFromCase(p domain.Plan, request, source, executor string, ref *domain.CaseRef) (domain.Run, error) {
 	r := domain.NewRun(p, source)
 	r.RequestID = request
-	if len(executor) > 0 {
-		r.Attempt.Executor = executor[0]
-	}
+	r.Attempt.Executor = executor
+	r.CaseRef = ref
 	if e := domain.CheckID(request); e != nil {
 		return r, e
 	}
@@ -42,7 +48,7 @@ func (s *Store) CreateManaged(p domain.Plan, request, source string, executor ..
 		if e = json.Unmarshal([]byte(body), &old); e != nil {
 			return r, e
 		}
-		if old.Plan.Hash != p.Hash || old.Source != source || old.Attempt.Executor != r.Attempt.Executor {
+		if domain.Hash(old.CaseRef) != domain.Hash(ref) || old.Plan.Hash != p.Hash || old.Source != source || old.Attempt.Executor != r.Attempt.Executor {
 			return r, domain.E("conflict", "request_id already refers to another plan or source")
 		}
 		return old, nil

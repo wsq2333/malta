@@ -115,6 +115,22 @@
         "files"
       ]
     },
+    "CaseRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "revision"
+      ]
+    },
     "Environment": {
       "properties": {
         "schema_version": {
@@ -377,6 +393,9 @@
     },
     "Run": {
       "properties": {
+        "case_ref": {
+          "$ref": "#/$defs/CaseRef"
+        },
         "schema_version": {
           "type": "string",
           "enum": [

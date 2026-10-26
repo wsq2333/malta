@@ -31,8 +31,12 @@ func Open(dir string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{DB: db, Dir: dir}
-	_, e = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS objects(kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE,body TEXT NOT NULL,digest TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL); PRAGMA user_version=1;`)
+	_, e = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS objects(kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE,body TEXT NOT NULL,digest TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL); `)
 	if e != nil {
+		db.Close()
+		return nil, e
+	}
+	if e = s.migrateCases(); e != nil {
 		db.Close()
 		return nil, e
 	}

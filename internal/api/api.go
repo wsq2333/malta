@@ -61,6 +61,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 func Handler(m *service.Manager, token string, frontend http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	s := m.Store
+	caseRoutes(mux, s)
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		send(w, 200, map[string]string{"status": "ok", "version": domain.Version}, nil)
 	})
