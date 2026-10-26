@@ -80,9 +80,10 @@ func TestScenarioCase(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	p.Spec.Scenario.Repeats = 2
 	q := domain.SaveCase{Name: "混合", Plan: p}
 	v, e := s.SaveCase("", q)
-	if e != nil || v.Plan.Hash != p.Hash {
+	if e != nil || v.Plan.Spec.Repeats != 2 || v.Plan.Validate() != nil {
 		t.Fatal("scenario changed", e)
 	}
 }

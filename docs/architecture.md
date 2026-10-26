@@ -92,7 +92,7 @@ Runner 记录工具退出码、超时、实际时长和每个 Trial 的完整性
 
 ## 5. 存储与部署
 
-首版使用 SQLite 保存索引、摘要、基线和比较记录，大型日志、时序数据和直方图保存在 artifact 文件中。数据库启用事务、外键、版本化 migrations 和有界写入重试。
+当前 SQLite schema v2 有 `objects`、`runs`、`test_cases`、`case_versions` 四张表。用例与版本是一对多关系，版本的联合主键为 `(case_id, revision)`；追加版本和更新最新指针在同一事务内完成。运行 JSON 保存完整计划和可选 `case_ref`，便于历史追溯与离线导入。详见 [用例管理](case-management.md)。大型日志、时序数据和直方图保存在 artifact 文件中，数据库使用 WAL、事务、外键与 busy timeout。
 
 SQLite WAL 允许读写并行，但同时只有一个 writer，且不适用于网络文件系统。因此数据库放在服务所在机器的本地磁盘，不能放到被测分布式文件系统上；多客户端通过服务访问数据。[SQLite WAL 文档](https://www.sqlite.org/wal.html)
 

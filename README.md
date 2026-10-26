@@ -14,6 +14,7 @@ Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共�
 | --- | --- |
 | 文件 I/O | fio 3.33；顺序读写、随机读写、混合读写；文件大小与块大小独立；jobs/depth 矩阵与重复实验 |
 | 元数据 | mdtest 4.0.0 文件模式导入；原生 stat 与 create/write/fsync/stat/read/unlink 生命周期；按引擎区分延迟口径 |
+| 用例管理 | 保存完整计划 JSON、名称与描述；不可变版本历史、编辑生成新版本、固定版本发起测试，支持 UI / CLI / API |
 | 混合场景 | 顺序/并行 fio、按操作数加权的数据与 stat、逐文件流水线；独立指标、实际配比和时间线 |
 | 环境 | 不可变快照；云厂商、区域、实例/物理机型号、client/server 角色、CPU/内存/存储/网络与配置 |
 | 版本 | 文件系统、版本标签、commit、构建或镜像身份；相同 ID 不可覆盖 |
@@ -55,6 +56,8 @@ bin/malta --server http://127.0.0.1:8080 compare --baseline RUN_ID --candidate O
 示例环境含 `unknown`，仅用于功能验证。正式基线请填写实际硬件/系统/挂载配置，并使用独立环境 ID。`benchmarks/data/lab-randread.yaml` 是更大的扫描模板，执行前明确容量与资源预算。
 
 服务默认监听 loopback。设置 `MALTA_TOKEN` 后 API 使用 Bearer 认证；绑定非 loopback 必须配置 Token，远程使用另配 TLS 代理或 SSH 隧道。UI 右上角连接设置可输入已有 Token，凭证仅保存在当前浏览器会话。
+
+可在侧栏「用例管理」保存和编辑测试 JSON，或通过 `malta case` 命令让 Agent 管理用例。编辑生成新版本，执行时固定版本号。见 [用例管理指南](docs/case-management.md)。
 
 ## 测试与服务隔离
 

@@ -10,6 +10,7 @@ import (
 func caseRoutes(mux *http.ServeMux, s *store.Store) {
 	mux.HandleFunc("GET /api/v1/cases", func(w http.ResponseWriter, r *http.Request) { v, e := s.Cases(); send(w, 200, v, e) })
 	save := func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
 		var q domain.SaveCase
 		e := decode(w, r, &q)
 		var v domain.CaseVersion

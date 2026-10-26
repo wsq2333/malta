@@ -10,10 +10,28 @@ import (
 )
 
 func (s *Store) migrateCases() error {
-	_, e := s.DB.Exec(`CREATE TABLE IF NOT EXISTS test_cases(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, latest_revision INTEGER NOT NULL);
+	var version int
+	if e := s.DB.QueryRow("PRAGMA user_version").Scan(&version); e != nil {
+		return e
+	}
+	if version > 2 {
+		return domain.E("unsupported", "database schema is newer than this Malta binary")
+	}
+	if _, e := s.DB.Exec("PRAGMA foreign_keys=ON"); e != nil {
+		return e
+	}
+	tx, e := s.DB.Begin()
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	_, e = tx.Exec(`CREATE TABLE IF NOT EXISTS test_cases(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, latest_revision INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS case_versions(case_id TEXT NOT NULL REFERENCES test_cases(id), revision INTEGER NOT NULL CHECK(revision>0), body TEXT NOT NULL, PRIMARY KEY(case_id,revision));
  PRAGMA user_version=2;`)
-	return e
+	if e != nil {
+		return e
+	}
+	return tx.Commit()
 }
 
 // SaveCase appends a revision under an optimistic lock. Derived trials/hash are rebuilt.
@@ -30,6 +48,11 @@ func (s *Store) SaveCase(id string, q domain.SaveCase) (domain.CaseVersion, erro
 	if p.SchemaVersion != p.Spec.SchemaVersion {
 		return out, domain.E("invalid", "plan and spec schema differ")
 	}
+	// Scenario wrapper name/repeats are derived from the editable scenario definition.
+	if p.Spec.Kind == "scenario" && p.Spec.Scenario != nil {
+		p.Spec.Name = p.Spec.Scenario.Name
+		p.Spec.Repeats = p.Spec.Scenario.Repeats
+	}
 	// Validate bounded input before expanding trials.
 	if e := p.Spec.Validate(); e != nil {
 		return out, e
@@ -37,8 +60,6 @@ func (s *Store) SaveCase(id string, q domain.SaveCase) (domain.CaseVersion, erro
 	var e error
 	if p.Spec.Kind == "scenario" {
 		p, e = domain.NewScenarioPlan(*p.Spec.Scenario, p.Environment, p.Version, p.Target, p.ResourceGroup)
-		p.Spec.Metadata = q.Plan.Spec.Metadata
-		p.Hash = p.Digest()
 	} else {
 		p, e = domain.NewPlan(p.Spec, p.Environment, p.Version, p.Target, p.ResourceGroup)
 	}

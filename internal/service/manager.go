@@ -36,7 +36,7 @@ type Manager struct {
 }
 type StartRequest struct {
 	CaseRef   *domain.CaseRef `json:"case_ref,omitempty"`
-	Plan      domain.Plan     `json:"plan"`
+	Plan      domain.Plan     `json:"plan,omitzero"`
 	RequestID string          `json:"request_id"`
 	Source    string          `json:"source"`
 	Executor  string          `json:"executor"`
@@ -130,7 +130,7 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 		return domain.Run{}, domain.E("invalid", "source must be human, agent or ci")
 	}
 	if q.CaseRef != nil {
-		if q.Plan.SchemaVersion != "" {
+		if domain.Hash(q.Plan) != domain.Hash(domain.Plan{}) {
 			return domain.Run{}, domain.E("invalid", "provide either plan or case_ref")
 		}
 		v, e := m.Store.CaseVersion(q.CaseRef.ID, q.CaseRef.Revision)

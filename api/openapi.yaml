@@ -11,6 +11,88 @@ servers:
 security:
 - bearerAuth: []
 paths:
+  /cases:
+    get:
+      responses:
+        '200':
+          description: Cases with latest immutable version, newest update first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: array
+                    items: {$ref: '../schemas/case.json'}
+    post:
+      description: Create v1; base_revision must be zero. Rebuild trials and hash. Maximum request 4 MiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/save-case.json'}
+      responses:
+        '201':
+          description: Immutable case version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseVersionEnvelope'}
+        '400': {description: Invalid input}
+  /cases/{id}/versions:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema: {type: string}
+    get:
+      responses:
+        '200':
+          description: All immutable versions in descending revision order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: array
+                    items: {$ref: '../schemas/case-version.json'}
+        '404': {description: Case not found}
+    post:
+      description: Append a revision if base_revision equals the latest revision; old snapshots never change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/save-case.json'}
+      responses:
+        '201':
+          description: New immutable case version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseVersionEnvelope'}
+        '400': {description: Invalid input}
+        '404': {description: Case not found}
+        '409': {description: Latest revision changed; reload before saving}
+  /cases/{id}/versions/{revision}:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema: {type: string}
+    - in: path
+      name: revision
+      required: true
+      schema: {type: integer, minimum: 1}
+    get:
+      responses:
+        '200':
+          description: A fixed case version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseVersionEnvelope'}
+        '404': {description: Case or revision not found}
   /capabilities:
     get:
       responses:
@@ -239,11 +321,22 @@ paths:
               type: object
               additionalProperties: false
               required:
-              - plan
               - request_id
               - source
               - executor
+              oneOf:
+              - required: [plan]
+                not: {required: [case_ref]}
+              - required: [case_ref]
+                not: {required: [plan]}
               properties:
+                case_ref:
+                  type: object
+                  additionalProperties: false
+                  required: [id, revision]
+                  properties:
+                    id: {type: string}
+                    revision: {type: integer, minimum: 1}
                 plan:
                   $ref: ../schemas/plan.json
                 request_id:
@@ -609,6 +702,12 @@ components:
       schema:
         type: string
   schemas:
+    CaseVersionEnvelope:
+      type: object
+      required: [schema_version, data]
+      properties:
+        schema_version: {const: '1.0'}
+        data: {$ref: '../schemas/case-version.json'}
     ErrorEnvelope:
       type: object
       required:

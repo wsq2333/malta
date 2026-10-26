@@ -92,3 +92,7 @@ new conversations can resume without knowing any database paths or tables.
 Use `plan --scenario benchmarks/scenarios/mixed-data.yaml` instead of `--spec`; the two flags are mutually exclusive. The resulting versioned plan uses the existing exec/run/import/export/baseline/compare commands. See [scenario definitions and engine limits](mixed-workloads.md). `result list --kind scenario` filters scenario runs.
 
 Capabilities advertise scenario_plan, scenario_sequential, scenario_parallel, scenario_weighted, scenario_pipeline and scenario_metadata_stat. The existing metadata_execution=false flag continues to describe standalone mdtest plans; native stat/lifecycle execution is scoped to scenarios. All-native scenarios do not require fio.
+
+## 用例库
+
+`case list/save/history/get` 管理完整计划与不可变版本；`run start --case CASE_ID --case-revision N` 使用固定版本执行，与 `--plan` 互斥。保存格式、冲突处理及 Agent 示例见 [用例管理](case-management.md)。

@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	for name, v := range map[string]any{"scenario": domain.ScenarioSpec{}, "spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}, "bundle": artifact.Bundle{}, "baseline": domain.Baseline{}, "comparison": domain.Comparison{}, "capabilities": domain.Capabilities{}} {
+	for name, v := range map[string]any{"case": domain.Case{}, "case-version": domain.CaseVersion{}, "save-case": domain.SaveCase{}, "scenario": domain.ScenarioSpec{}, "spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}, "bundle": artifact.Bundle{}, "baseline": domain.Baseline{}, "comparison": domain.Comparison{}, "capabilities": domain.Capabilities{}} {
 		r := new(jsonschema.Reflector)
 		s := r.Reflect(v)
 		// Scenario timing is inherited from the stage. Keep the legacy Workload
