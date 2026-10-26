@@ -1,0 +1,155 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "malta",
+    "namespace": "${NAMESPACE}"
+  },
+  "spec": {
+    "replicas": 1,
+    "strategy": {
+      "type": "Recreate"
+    },
+    "selector": {
+      "matchLabels": {
+        "app": "malta-server"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "malta-server"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "malta-server",
+        "securityContext": {
+          "runAsNonRoot": true,
+          "runAsUser": 10001,
+          "runAsGroup": 10001,
+          "fsGroup": 10001,
+          "seccompProfile": {
+            "type": "RuntimeDefault"
+          }
+        },
+        "terminationGracePeriodSeconds": 60,
+        "containers": [
+          {
+            "name": "server",
+            "image": "${SERVER_IMAGE}",
+            "command": [
+              "/usr/local/bin/malta"
+            ],
+            "args": [
+              "serve",
+              "--listen",
+              "0.0.0.0:8080",
+              "--data-dir",
+              "/var/lib/malta",
+              "--kubernetes-config",
+              "/etc/malta/executor.json",
+              "--run-timeout",
+              "1h",
+              "--max-bytes",
+              "1073741824"
+            ],
+            "env": [
+              {
+                "name": "MALTA_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "name": "${TOKEN_SECRET}",
+                    "key": "token"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "containerPort": 8080
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "250m",
+                "memory": "256Mi"
+              },
+              "limits": {
+                "cpu": "1000m",
+                "memory": "1Gi"
+              }
+            },
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "state",
+                "mountPath": "/var/lib/malta"
+              },
+              {
+                "name": "results",
+                "mountPath": "${RESULTS_DIR}"
+              },
+              {
+                "name": "config",
+                "mountPath": "/etc/malta",
+                "readOnly": true
+              },
+              {
+                "name": "tmp",
+                "mountPath": "/tmp"
+              }
+            ],
+            "readinessProbe": {
+              "tcpSocket": {
+                "port": 8080
+              },
+              "initialDelaySeconds": 2,
+              "periodSeconds": 5
+            },
+            "livenessProbe": {
+              "tcpSocket": {
+                "port": 8080
+              },
+              "initialDelaySeconds": 15,
+              "periodSeconds": 10
+            }
+          }
+        ],
+        "volumes": [
+          {
+            "name": "state",
+            "persistentVolumeClaim": {
+              "claimName": "${STATE_PVC}"
+            }
+          },
+          {
+            "name": "results",
+            "persistentVolumeClaim": {
+              "claimName": "${RESULTS_PVC}"
+            }
+          },
+          {
+            "name": "config",
+            "configMap": {
+              "name": "malta-executor"
+            }
+          },
+          {
+            "name": "tmp",
+            "emptyDir": {
+              "sizeLimit": "64Mi"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -24,9 +24,12 @@ func (s *Store) ByRequest(id string) (domain.Run, error) {
 	return r, e
 }
 
-func (s *Store) CreateManaged(p domain.Plan, request, source string) (domain.Run, error) {
+func (s *Store) CreateManaged(p domain.Plan, request, source string, executor ...string) (domain.Run, error) {
 	r := domain.NewRun(p, source)
 	r.RequestID = request
+	if len(executor) > 0 {
+		r.Attempt.Executor = executor[0]
+	}
 	if e := domain.CheckID(request); e != nil {
 		return r, e
 	}
@@ -39,7 +42,7 @@ func (s *Store) CreateManaged(p domain.Plan, request, source string) (domain.Run
 		if e = json.Unmarshal([]byte(body), &old); e != nil {
 			return r, e
 		}
-		if old.Plan.Hash != p.Hash || old.Source != source {
+		if old.Plan.Hash != p.Hash || old.Source != source || old.Attempt.Executor != r.Attempt.Executor {
 			return r, domain.E("conflict", "request_id already refers to another plan or source")
 		}
 		return old, nil
@@ -92,7 +95,12 @@ func (s *Store) Finish(b artifact.Bundle) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e := artifact.Write(filepath.Join(s.Dir, "artifacts", b.Run.ID), b); e != nil {
+	dir := filepath.Join(s.Dir, "artifacts", b.Run.ID)
+	if existing, e := artifact.Read(dir); e == nil {
+		if artifact.Digest(existing) != artifact.Digest(b) {
+			return domain.E("conflict", "existing durable bundle differs")
+		}
+	} else if e = artifact.Write(dir, b); e != nil {
 		return e
 	}
 	res, e := s.DB.Exec("UPDATE runs SET body=?,digest=? WHERE id=? AND digest=''", encode(b.Run), artifact.Digest(b), b.Run.ID)
@@ -111,7 +119,7 @@ func (s *Store) Finish(b artifact.Bundle) error {
 func (s *Store) NextPending() (domain.Run, error) {
 	var r domain.Run
 	var b string
-	e := s.DB.QueryRow("SELECT body FROM runs WHERE json_extract(body,'$.status')='pending' AND request_id IS NOT NULL ORDER BY created_at,id LIMIT 1").Scan(&b)
+	e := s.DB.QueryRow("SELECT body FROM runs WHERE (json_extract(body,'$.status')='pending' OR (json_extract(body,'$.attempt.executor')='kubernetes' AND json_extract(body,'$.status') IN ('running','preparing','cancelling'))) AND digest='' AND request_id IS NOT NULL ORDER BY created_at,id LIMIT 1").Scan(&b)
 	if errors.Is(e, sql.ErrNoRows) {
 		return r, domain.E("not_found", "queue empty")
 	}
@@ -146,6 +154,19 @@ func (s *Store) Recover() error {
 		return e
 	}
 	for _, r := range runs {
+		// Recover the atomic bundle -> SQLite crash window without executing the run again.
+		if b, err := artifact.Read(filepath.Join(s.Dir, "artifacts", r.ID)); err == nil {
+			if b.Run.ID != r.ID || b.Run.Attempt.ID != r.Attempt.ID || b.Run.Plan.Hash != r.Plan.Hash || b.Run.RequestID != r.RequestID || b.Run.Source != r.Source || b.Run.Attempt.Executor != r.Attempt.Executor {
+				return domain.E("conflict", "durable bundle identity differs during recovery")
+			}
+			if err = s.Finish(b); err != nil {
+				return err
+			}
+			continue
+		}
+		if r.Attempt.Executor == "kubernetes" {
+			continue
+		}
 		if domain.Terminal(r.Status) && r.Attempt.ResultState == "failed" {
 			continue
 		}

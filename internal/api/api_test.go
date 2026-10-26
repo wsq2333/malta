@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/wsq2333/malta/internal/domain"
+	"github.com/wsq2333/malta/internal/engine/fio"
 	"github.com/wsq2333/malta/internal/service"
 	"github.com/wsq2333/malta/internal/store"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,6 +41,24 @@ func fakeFio(t *testing.T, slow bool) string {
 	t.Helper()
 	dir := t.TempDir()
 	raw, e := os.ReadFile("../../testdata/fio/fio-3.33.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	// The fake tool reports options for this test's actual plan, like real fio.
+	var fixtureJSON map[string]any
+	if e = json.Unmarshal(raw, &fixtureJSON); e != nil {
+		t.Fatal(e)
+	}
+	options := map[string]string{}
+	p := testPlan(t, "/unused")
+	for _, arg := range fio.Args(p, p.Trials[0], "/unused", false) {
+		key, value, ok := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
+		if ok {
+			options[key] = value
+		}
+	}
+	fixtureJSON["jobs"].([]any)[0].(map[string]any)["job options"] = options
+	raw, e = json.Marshal(fixtureJSON)
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -1,36 +1,95 @@
-# Kubernetes 部署与测试运行
+# Kubernetes: Server Deployment + Runner Job
 
-状态：目录预留与设计，尚无可直接 apply 的 YAML 或已发布 Runner 镜像。
+S5 implements one serial client Job per server. Kubernetes 1.35+ and kubectl
+1.35.0 are the initial integration target. Both images must be pinned by digest.
+The service's SQLite directory is independent of benchmark and results storage.
 
-## 目录职责
+## Prerequisites
 
-- `base/`：规划服务 Deployment/Service、配置和身份；单副本服务起步。
-- `jobs/`：规划单客户端 Runner Job，挂载现有 PVC 并执行固定计划。
-- `overlays/`：规划按环境设置 namespace、PVC、节点选择、资源和镜像 digest。
+- Existing namespace and three **different** PVCs: state (SQLite-safe local locks),
+  benchmark (Bound filesystem RWO or RWX), results (Bound filesystem **RWX**).
+- Results filesystem must support atomic mkdir and be mounted at `results_dir`
+  on the server and `/results` on the worker. A per-attempt handshake verifies
+  the shared mount before any benchmark I/O; a durable claim prevents replay.
+- An explicit Ready, schedulable benchmark node whose hostname label equals its
+  name. Kubernetes scheduling checks PVC topology; unschedulable Jobs terminate
+  at the deadline. Populate cloud, model, storage and network in the environment.
+- UID/GID 10001 must be able to write all three volumes. If the CSI ignores fsGroup,
+  provision ownership separately; no privileged init container is supplied.
+- Benchmark and results CSI performance/isolation, node affinity and capacity
+  must be validated in the target cluster. Metadata claims cannot prove these.
+  Server and runner resource limits are explicit; keep service load off benchmark
+  nodes when possible. SQLite server replicas must remain 1 with Recreate updates.
 
-使用 Kustomize 风格的目录组织起步，待实际 manifest 实现后验证组合，不同时维护重复的 Helm 方案。
+## Render and install
 
-## 三类挂载
+1. Build images with `build/docker/Dockerfile.server` and `Dockerfile.runner`;
+   push to your chosen registry, record their resulting digests.
+2. Copy `overlays/example/executor.json`; set cluster/node/PVC/image/resources.
+   Keep `context` empty inside the service Pod. For a host-run server, set the
+   explicit kubeconfig context and mount the same results filesystem locally.
+3. Create a Secret named `malta-api-token` with key `token` using your secret
+   management process. The server token must not be committed.
+4. Render without making cluster changes:
 
-| 路径 | 用途 | 生命周期 |
-| --- | --- | --- |
-| `/bench` | 现有被测 PVC，使用独立 run/attempt 子目录 | 不删除 PVC，只处理本次记录的测试文件 |
-| `/etc/malta` | 展开后的 plan/config，只读 | 绑定计划摘要和 Run |
-| `/results` | 独立结果存储或上传暂存目录 | 导入/上传确认后才允许清理 Pod |
+```sh
+python3 scripts/render-kubernetes.py --config executor.json \
+  --server-image YOUR_SERVER_IMAGE_AT_SHA256 \
+  --state-pvc malta-state --token-secret malta-api-token > deployment.json
+kubectl --context YOUR_CONTEXT apply --dry-run=server -f deployment.json
+kubectl --context YOUR_CONTEXT apply -f deployment.json
+```
 
-服务数据库独立存储，不能放在被测卷中。采用 SQLite 时使用支持本地文件锁语义的文件系统；存储可用性和服务单副本约束须在部署时验证。
+`base/*.json` are parameterized manifests, not directly applicable files. The
+renderer resolves all placeholders and adds the executor ConfigMap. Namespace,
+PVCs and API Secret intentionally remain operator-owned. RBAC lets the server
+manage Jobs/config maps and read Pod logs/PVCs plus one named Node. The separate
+Runner service account has no roles and no mounted API token.
 
-## 执行与恢复
+## Plan and run
 
-1. 提交端校验 cluster/context、namespace、PVC、访问模式、拓扑和资源额度，固定计划及镜像。
-2. Job Pod 执行 `malta exec`，记录实际节点、Pod UID、attempt_id、环境与挂载。
-3. 测试输出结果包；结果持久化或上传成功与 I/O 成功分别记录。
-4. 服务导入并确认 artifact 可读后，再启用 Job TTL 清理。
+Update `environments/kubernetes.yaml` with immutable hardware identity. Its
+`config.cluster`, `config.node`, and `config.benchmark_pvc` must match the executor.
 
-默认规划 `restartPolicy: Never`、`backoffLimit: 0`、显式 deadline。它们不能保证底层任务只启动一次；资源组协调与 attempt 身份仍需处理重复 Pod、抢占、中断和恢复。重试不冒充独立的重复实验。
+```sh
+malta plan --spec benchmarks/data/smoke-read.yaml \
+  --environment environments/kubernetes.yaml --version environments/version-example.yaml \
+  --target /bench --resource-group lab --out plan.json
+malta kubernetes check --config executor.json --plan plan.json
+malta --server http://127.0.0.1:8080 run start --executor kubernetes \
+  --plan plan.json --request-id experiment-001 --source human
+malta --server http://127.0.0.1:8080 run wait RUN_ID --timeout 5m
+malta --server http://127.0.0.1:8080 run logs RUN_ID
+malta --server http://127.0.0.1:8080 run cancel RUN_ID
+```
 
-执行 Pod 仅消费已挂载存储，默认关闭 ServiceAccount token 自动挂载。提交端使用目标 namespace 内的 Job/Pod 查询与管理权限，日志权限单独声明。节点或集群元数据查询按需要由提交端提供，缺失时标为 unknown。特殊 FUSE 自挂载另做适配，默认路径复用 CSI，不要求 privileged。
+Use port-forward or authenticated TLS ingress; `MALTA_TOKEN` supplies API auth.
+`kubernetes check` is a read-only prerequisite check, not an I/O permission test.
 
-单 Pod 先验收；多客户端需另行验证共享访问模式、启动同步、时间窗口和聚合算法，增加 Job parallelism 不等于完成分布式测量。
+## Recovery and evidence
 
-参考：[Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)、[PV/PVC](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)、[ServiceAccount](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)。
+The run records Job UID, all observed Pod UIDs, restart count, exit code and image
+ID. `environment-observed.json`, `job.json`, `pods.json`, logs, and fio outputs
+remain in the downloadable bundle after cleanup. The run's declared environment
+is immutable; the observed snapshot is separate evidence, not an automatic
+hardware certification.
+
+Service shutdown detaches from Kubernetes work. Restart with the same database,
+results mount and executor configuration reconciles the same Job/Attempt.
+A request ID reused with a different plan/source/executor is rejected.
+Cancellation suspends the Job and waits for Pods to stop before finalization.
+An unreachable node may prevent termination confirmation: the run reports a
+failure, retains the Job and evidence, and requires operator inspection. Never
+force-delete a Pod as proof that I/O on an unreachable node has stopped.
+
+No TTL is set. Only confirmed durable, complete evidence allows Job cleanup.
+Missing/invalid results and persistence failures retain objects for investigation.
+An API/identity failure can leave a Job running until its active deadline; inspect
+it before starting further load. After fixing a persistence issue, export the
+retained worker bundle and import it into a separate inspection store; do not
+reset claims or reuse an attempt ID. `/results/<attempt>` and benchmark data are
+retained for explicit cleanup; record retention is not automated in v0.1.
+
+Actual tested combinations and limitations are tracked in
+[the validation record](../../docs/validation-s5-s7.md). No production CSI support
+is implied by the functional test fixture.

@@ -118,3 +118,37 @@ func TestCompareConditionsAndZero(t *testing.T) {
 		t.Fatal("date alone blocked comparison")
 	}
 }
+
+func TestRecoverDurableBundleBeforeDatabaseCommit(t *testing.T) {
+	s, e := Open(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	original := sample(t)
+	r, e := s.CreateManaged(original.Run.Plan, "crash-window", "ci", "kubernetes")
+	if e != nil {
+		t.Fatal(e)
+	}
+	original.Run.ID = r.ID
+	original.Run.RequestID = r.RequestID
+	original.Run.Source = r.Source
+	original.Run.Attempt.ID = r.Attempt.ID
+	original.Run.Attempt.Executor = "kubernetes"
+	if e = artifact.Write(filepath.Join(s.Dir, "artifacts", r.ID), original); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Recover(); e != nil {
+		t.Fatal(e)
+	}
+	recovered, e := s.Run(r.ID)
+	if e != nil || recovered.Status != "succeeded" {
+		t.Fatalf("%s %v", recovered.Status, e)
+	}
+	if _, e = s.Bundle(r.ID); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Recover(); e != nil {
+		t.Fatal(e)
+	}
+}

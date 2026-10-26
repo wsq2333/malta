@@ -5,6 +5,33 @@
   "$defs": {
     "Attempt": {
       "properties": {
+        "job_name": {
+          "type": "string"
+        },
+        "job_uid": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "backend_hash": {
+          "type": "string"
+        },
+        "pod_uids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "restarts": {
+          "type": "integer"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "image_id": {
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },

@@ -283,6 +283,14 @@ type Trial struct {
 	Error      string    `json:"error,omitempty"`
 }
 type Attempt struct {
+	JobName     string    `json:"job_name,omitempty"`
+	JobUID      string    `json:"job_uid,omitempty"`
+	Namespace   string    `json:"namespace,omitempty"`
+	BackendHash string    `json:"backend_hash,omitempty"`
+	PodUIDs     []string  `json:"pod_uids,omitempty"`
+	Restarts    int       `json:"restarts,omitempty"`
+	ExitCode    *int      `json:"exit_code,omitempty"`
+	ImageID     string    `json:"image_id,omitempty"`
 	ID          string    `json:"id"`
 	Status      string    `json:"status"`
 	Executor    string    `json:"executor"`

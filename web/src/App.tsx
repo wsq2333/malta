@@ -115,6 +115,7 @@ export function App() {
     [token, setToken] = useState(sessionStorage.getItem("malta-token") || ""),
     [jsonInput, setJSONInput] = useState(""),
     [requestId, setRequestId] = useState(""),
+    [executor, setExecutor] = useState("local"),
     [baselineName, setBaselineName] = useState(""),
     [modalError, setModalError] = useState(""),
     [logs, setLogs] = useState<unknown>(null);
@@ -304,7 +305,7 @@ export function App() {
           plan,
           request_id: requestId,
           source: "human",
-          executor: "local",
+          executor,
         });
         setSelected(run);
         setPage("runs");
@@ -1230,6 +1231,10 @@ export function App() {
               <RunMetrics run={selected} />
               <div className="detail-bottom">
                 <details>
+                  <summary>执行 Attempt 与集群状态</summary>
+                  <pre>{JSON.stringify(selected.attempt, null, 2)}</pre>
+                </details>
+                <details>
                   <summary>完整执行计划与不可变快照</summary>
                   <pre>{JSON.stringify(selected.plan, null, 2)}</pre>
                 </details>
@@ -1316,9 +1321,23 @@ export function App() {
               <>
                 <p>
                   {modal === "start"
-                    ? "粘贴 malta plan 生成的完整 JSON。提交后将在服务所在节点的已授权目录执行真实 I/O。"
+                    ? "粘贴 malta plan 生成的完整 JSON。选择 local 在服务节点执行，或 kubernetes 在已配置的独立 Job 中执行真实 I/O。"
                     : "粘贴与版本化 schema 一致的 JSON。相同 ID 不能覆盖不同内容；请为变更登记新 ID。"}
                 </p>
+                {modal === "start" && (
+                  <label>
+                    执行器
+                    <select
+                      value={executor}
+                      onChange={(e) => setExecutor(e.target.value)}
+                    >
+                      <option value="local">Local · 服务节点</option>
+                      <option value="kubernetes">
+                        Kubernetes · 独立 Runner Job
+                      </option>
+                    </select>
+                  </label>
+                )}
                 {modal === "start" && (
                   <label>
                     Request ID

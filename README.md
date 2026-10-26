@@ -6,7 +6,7 @@ Malta is an agent-enhanced platform for orchestrating, managing, and comparing d
 
 Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共用一套 CLI、测试定义和结果契约，完成“制定计划 → 执行测试 → 管理运行 → 对照基线 → 分析证据”。名称取自地中海岛国马耳他。
 
-> **当前范围：S0–S4 本地执行闭环。** Go CLI/API、fio 执行器、SQLite、结果导入导出、基线比较、React UI 和本地 Agent skill 已实现。Kubernetes Job 执行器、容器发布和自动分析属于后续阶段；目录与架构已预留。当前不是生产高可用服务。
+> **当前范围：S0–S5 已实现。** 本地与 Kubernetes Job 执行、CLI/API、结果存储、基线比较及 React UI 已接通。服务 Pod 与测试 Pod 独立，通过结果 PVC 回传证据。Agent 工作流和 RC 交付正在 S6–S7 完善；当前不是生产高可用服务。
 
 ## 已实现的能力
 
@@ -59,9 +59,9 @@ bin/malta --server http://127.0.0.1:8080 compare --baseline RUN_ID --candidate O
 
 **Server Pod 与测试 Runner Pod 分开部署。** Server 保存 API/UI、SQLite 和证据；测试 Job 挂载被测文件系统，执行压测并回传结果。测试 PVC 与元数据/结果存储分开；关键基线进一步隔离节点、CPU、磁盘与网络资源。
 
-S0–S4 使用一个本地工作进程完成生命周期验证，所有资源组保守地串行执行。它不是 Kubernetes 隔离架构的替代。S5 再实现独立 Runner Job、PVC、取消与结果回传。详见 [架构决策 ADR-0001](docs/adr/0001-server-runner-separation.md)。
+本地和 Kubernetes 后端共用一条保守串行队列。Kubernetes 使用独立 Runner Job、已有测试 PVC 与独立 RWX 结果 PVC，支持取消与重启接管。部署方法见 [Kubernetes 指南](deploy/kubernetes/README.md)。详见 [架构决策 ADR-0001](docs/adr/0001-server-runner-separation.md)。
 
-服务重启将未完成任务标记为 `interrupted`，不自动重放写测试。客户端等待超时不取消任务；重试提交必须复用原 request-id。只有 `attempt.result_state=complete` 才表示证据持久化完成。被测数据保留在独立 run/attempt 子目录，具体位置记录于 `data-paths.json`，由操作者检查后清理。
+服务重启将未完成的本地任务标记为 `interrupted`；Kubernetes 任务接管原 Job/Attempt，不重放压测。客户端等待超时不取消任务；重试提交必须复用原 request-id。只有 `attempt.result_state=complete` 才表示证据持久化完成。被测数据保留在独立 run/attempt 子目录，具体位置记录于 `data-paths.json`，由操作者检查后清理。
 
 ## 项目结构
 

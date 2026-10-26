@@ -1,0 +1,20 @@
+schema_version: '1.0'
+id: lab-kubernetes-r1
+name: Kubernetes benchmark client (replace hardware before use)
+kind: kubernetes
+provider: unknown
+region: unknown
+machines:
+  - role: client
+    model: unknown
+    count: 1
+    cpu: unknown
+    memory_bytes: 0
+    storage: unknown
+    network: unknown
+os: unknown
+config:
+  cluster: lab-cluster
+  node: benchmark-node
+  benchmark_pvc: benchmark-data
+  purpose: functional-smoke-only

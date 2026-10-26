@@ -244,6 +244,17 @@ func Handler(m *service.Manager, token string, frontend http.Handler) http.Handl
 				}
 			}
 		}
+		if run.Attempt.Executor == "kubernetes" && !domain.Terminal(run.Status) {
+			if f, e := os.Open(filepath.Join(s.Dir, "work", id, "runner.stderr")); e == nil {
+				data, _ := io.ReadAll(io.LimitReader(f, 65537))
+				f.Close()
+				truncated := len(data) > 65536
+				if truncated {
+					data = data[:65536]
+				}
+				logs = append(logs, entry{"runner.stderr", string(data), truncated})
+			}
+		}
 		sort.Slice(logs, func(i, j int) bool { return logs[i].Path < logs[j].Path })
 		send(w, 200, map[string]any{"status": run.Status, "entries": logs, "format": "snapshot"}, nil)
 	})

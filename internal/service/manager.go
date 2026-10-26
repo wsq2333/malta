@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/wsq2333/malta/internal/artifact"
 	"github.com/wsq2333/malta/internal/domain"
+	kube "github.com/wsq2333/malta/internal/executor/kubernetes"
 	"github.com/wsq2333/malta/internal/runner"
 	"github.com/wsq2333/malta/internal/store"
 	"os"
@@ -16,6 +17,7 @@ import (
 )
 
 type Config struct {
+	Kubernetes   *kube.Executor
 	AllowedRoots []string
 	Fio          string
 	MaxBytes     int64
@@ -40,7 +42,7 @@ type StartRequest struct {
 }
 
 func New(s *store.Store, c Config) (*Manager, error) {
-	if len(c.AllowedRoots) == 0 {
+	if len(c.AllowedRoots) == 0 && c.Kubernetes == nil {
 		return nil, domain.E("invalid", "at least one --allow-target is required")
 	}
 	if c.MaxBytes <= 0 || c.Timeout <= 0 {
@@ -73,26 +75,36 @@ func New(s *store.Store, c Config) (*Manager, error) {
 	go m.loop()
 	return m, nil
 }
-func (m *Manager) Validate(p domain.Plan) error {
+func (m *Manager) Validate(p domain.Plan) error { return m.validate(p, "local") }
+func (m *Manager) validate(p domain.Plan, executor string) error {
 	if e := p.Validate(); e != nil {
 		return e
 	}
 	if p.Spec.Kind != "data" || p.Spec.Workload.CacheState == "cold-verified" {
 		return domain.E("unsupported", "local runner supports data plans without cold-verified claims")
 	}
-	target, e := filepath.EvalSymlinks(p.Target)
-	if e != nil {
-		return domain.E("invalid", "target does not exist")
-	}
-	allowed := false
-	for _, root := range m.Config.AllowedRoots {
-		rel, e := filepath.Rel(root, target)
-		if e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			allowed = true
+	if executor == "kubernetes" {
+		if m.Config.Kubernetes == nil {
+			return domain.E("unsupported", "Kubernetes executor is not configured")
 		}
-	}
-	if !allowed {
-		return domain.E("invalid", "target is outside configured allowed roots")
+		if e := m.Config.Kubernetes.Validate(p); e != nil {
+			return e
+		}
+	} else {
+		target, e := filepath.EvalSymlinks(p.Target)
+		if e != nil {
+			return domain.E("invalid", "target does not exist")
+		}
+		allowed := false
+		for _, root := range m.Config.AllowedRoots {
+			rel, e := filepath.Rel(root, target)
+			if e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+				allowed = true
+			}
+		}
+		if !allowed {
+			return domain.E("invalid", "target is outside configured allowed roots")
+		}
 	}
 	var bytes int64
 	for _, pnt := range p.Trials {
@@ -113,8 +125,8 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 	if m.ctx.Err() != nil {
 		return domain.Run{}, domain.E("conflict", "server is shutting down")
 	}
-	if q.Executor != "local" {
-		return domain.Run{}, domain.E("unsupported", "only local executor is implemented; Kubernetes is S5")
+	if q.Executor != "local" && q.Executor != "kubernetes" {
+		return domain.Run{}, domain.E("unsupported", "executor must be local or kubernetes")
 	}
 	if q.Source != "human" && q.Source != "agent" && q.Source != "ci" {
 		return domain.Run{}, domain.E("invalid", "source must be human, agent or ci")
@@ -126,7 +138,7 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 		return domain.Run{}, e
 	}
 	if old, e := m.Store.ByRequest(q.RequestID); e == nil {
-		if old.Plan.Hash != q.Plan.Hash || old.Source != q.Source {
+		if old.Plan.Hash != q.Plan.Hash || old.Source != q.Source || old.Attempt.Executor != q.Executor {
 			return domain.Run{}, domain.E("conflict", "request_id already refers to another plan or source")
 		}
 		return old, nil
@@ -136,10 +148,10 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 			return domain.Run{}, e
 		}
 	}
-	if e := m.Validate(q.Plan); e != nil {
+	if e := m.validate(q.Plan, q.Executor); e != nil {
 		return domain.Run{}, e
 	}
-	return m.Store.CreateManaged(q.Plan, q.RequestID, q.Source)
+	return m.Store.CreateManaged(q.Plan, q.RequestID, q.Source, q.Executor)
 }
 func (m *Manager) Cancel(id string) (domain.Run, error) {
 	m.mu.Lock()
@@ -151,8 +163,10 @@ func (m *Manager) Cancel(id string) (domain.Run, error) {
 	if domain.Terminal(r.Status) {
 		return r, nil
 	}
-	if m.active == id {
-		m.cancel()
+	if m.active == id || (r.Attempt.Executor == "kubernetes" && r.Attempt.JobName != "") {
+		if r.Attempt.Executor != "kubernetes" {
+			m.cancel()
+		}
 		r.Status = "cancelling"
 	} else {
 		r.Status = "cancelled"
@@ -186,7 +200,7 @@ func (m *Manager) loop() {
 			m.mu.Unlock()
 			continue
 		}
-		if e = m.Validate(r.Plan); e != nil {
+		if e = m.validate(r.Plan, r.Attempt.Executor); e != nil {
 			r.Status = "failed"
 			r.Error = e.Error()
 			r.Attempt.Status = "failed"
@@ -200,16 +214,38 @@ func (m *Manager) loop() {
 		m.cancel = cancel
 		m.mu.Unlock()
 		out := filepath.Join(m.Store.Dir, "work", r.ID)
-		final, runErr := runner.Execute(ctx, r, out, runner.Options{Fio: m.Config.Fio, MaxBytes: m.Config.MaxBytes, Timeout: m.Config.Timeout, OnUpdate: func(update domain.Run) error {
-			m.mu.Lock()
-			defer m.mu.Unlock()
-			if domain.Terminal(update.Status) {
-				update.Attempt.ResultState = "collecting"
-			} else if ctx.Err() != nil {
-				update.Status = "cancelling"
-			}
-			return m.Store.Update(update)
-		}})
+		var final domain.Run
+		var runErr error
+		if r.Attempt.Executor == "kubernetes" {
+			final, runErr = m.Config.Kubernetes.Execute(ctx, r, out, kube.Options{Timeout: m.Config.Timeout, MaxBytes: m.Config.MaxBytes, Update: func(update domain.Run) error {
+				m.mu.Lock()
+				defer m.mu.Unlock()
+				old, e := m.Store.Run(update.ID)
+				if e != nil {
+					return e
+				}
+				if old.Status == "cancelling" {
+					update.Status = "cancelling"
+				}
+				return m.Store.Update(update)
+			}, Cancelled: func() bool { old, e := m.Store.Run(r.ID); return e == nil && old.Status == "cancelling" }})
+		} else {
+			final, runErr = runner.Execute(ctx, r, out, runner.Options{Fio: m.Config.Fio, MaxBytes: m.Config.MaxBytes, Timeout: m.Config.Timeout, OnUpdate: func(update domain.Run) error {
+				m.mu.Lock()
+				defer m.mu.Unlock()
+				if domain.Terminal(update.Status) {
+					update.Attempt.ResultState = "collecting"
+				} else if ctx.Err() != nil {
+					update.Status = "cancelling"
+				}
+				return m.Store.Update(update)
+			}})
+		}
+		if errors.Is(runErr, kube.ErrDetached) {
+			cancel()
+			return
+		}
+
 		cancel()
 		m.mu.Lock()
 		if !domain.Terminal(final.Status) {
@@ -217,6 +253,9 @@ func (m *Manager) loop() {
 			final.Attempt.Status = "failed"
 		}
 		if runErr != nil {
+			if r.Attempt.Executor == "kubernetes" {
+				final.Attempt.ResultState = "failed"
+			}
 			final.Error = runErr.Error()
 			if final.Status == "succeeded" {
 				final.Status = "failed"
@@ -225,7 +264,9 @@ func (m *Manager) loop() {
 		}
 		final.UpdatedAt = time.Now().UTC()
 		final.Attempt.FinishedAt = time.Now().UTC()
-		final.Attempt.ResultState = "complete"
+		if final.Attempt.ResultState != "failed" {
+			final.Attempt.ResultState = "complete"
+		}
 		b, collectErr := artifact.Collect(out, final)
 		if errors.Is(collectErr, os.ErrNotExist) {
 			b = artifact.Bundle{SchemaVersion: domain.Schema, Run: final, Files: []artifact.File{}}
@@ -233,6 +274,11 @@ func (m *Manager) loop() {
 		}
 		if collectErr == nil {
 			collectErr = m.Store.Finish(b)
+		}
+		if collectErr == nil && r.Attempt.Executor == "kubernetes" && final.Attempt.ResultState == "complete" {
+			if cleanupErr := m.Config.Kubernetes.Cleanup(context.Background(), final); cleanupErr != nil {
+				fmt.Fprintln(os.Stderr, "Kubernetes cleanup deferred:", cleanupErr)
+			}
 		}
 		if collectErr != nil {
 			final.Status = "failed"

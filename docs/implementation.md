@@ -40,6 +40,15 @@ Final validation on 2026-10-26:
 
 Remote test workspace: `/tmp/malta-s0-s4-20261026`. S3/S4 smoke workspaces retain result bundles and CLI output for inspection; temporary services are stopped by the script. Tool builds were isolated there. Test evidence is functional local-storage evidence, not a measured Curvine or distributed filesystem performance baseline.
 
+## S5 — independent Kubernetes Runner
+
+Implemented digest-pinned images, parameterized deployment/RBAC manifests,
+read-only prerequisite checks, per-attempt claims and shared-volume handshake,
+Job/PVC execution, identity/status/log evidence, cancellation, restart reconciliation
+and cleanup only after persistence. UI supports executor selection and Attempt details.
+Remote Linux real-fio tests and an isolated Kubernetes 1.35.0 lifecycle/fault suite
+passed. See [validation details](validation-s5-s7.md).
+
 ## Remaining scope
 
-Kubernetes Job execution, deployment manifests/images and independent Runner Pods remain S5; cluster Agent acceptance and advanced analysis remain S6; production release hardening remains S7. The current server uses one local worker and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.
+S6 completes the Agent interface and workflows; S7 prepares RC delivery. Production CSI/node-failure and external model acceptance remain environment-specific gates. The server retains a serial queue and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.

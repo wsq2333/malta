@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wsq2333/malta/internal/api"
 	"github.com/wsq2333/malta/internal/domain"
+	kube "github.com/wsq2333/malta/internal/executor/kubernetes"
 	"github.com/wsq2333/malta/internal/service"
 	"github.com/wsq2333/malta/internal/store"
 	"github.com/wsq2333/malta/web"
@@ -71,11 +72,11 @@ func typedRun(v any) (domain.Run, error) {
 	return r, e
 }
 func serverCommands(root *cobra.Command, o *Options) {
-	var address, fioPath string
+	var address, fioPath, kubeConfig string
 	var allowed []string
 	var bytesBudget int64
 	var timeout time.Duration
-	serve := &cobra.Command{Use: "serve", Args: cobra.NoArgs, Short: "Serve API and manage one local benchmark worker", RunE: func(c *cobra.Command, _ []string) error {
+	serve := &cobra.Command{Use: "serve", Args: cobra.NoArgs, Short: "Serve API and manage local or Kubernetes benchmarks", RunE: func(c *cobra.Command, _ []string) error {
 		host, _, e := net.SplitHostPort(address)
 		if e != nil {
 			return domain.E("invalid", e.Error())
@@ -89,7 +90,18 @@ func serverCommands(root *cobra.Command, o *Options) {
 			return e
 		}
 		defer s.Close()
-		m, e := service.New(s, service.Config{AllowedRoots: allowed, Fio: fioPath, MaxBytes: bytesBudget, Timeout: timeout})
+		var backend *kube.Executor
+		if kubeConfig != "" {
+			var config kube.Config
+			if e = domain.Read(kubeConfig, &config); e != nil {
+				return e
+			}
+			backend, e = kube.New(config)
+			if e != nil {
+				return e
+			}
+		}
+		m, e := service.New(s, service.Config{AllowedRoots: allowed, Fio: fioPath, MaxBytes: bytesBudget, Timeout: timeout, Kubernetes: backend})
 		if e != nil {
 			return e
 		}
@@ -123,7 +135,7 @@ func serverCommands(root *cobra.Command, o *Options) {
 	f.StringVar(&fioPath, "fio", "fio", "fio executable")
 	f.Int64Var(&bytesBudget, "max-bytes", 1<<30, "Maximum prepared bytes per run")
 	f.DurationVar(&timeout, "run-timeout", time.Hour, "Total per-run deadline")
-	_ = serve.MarkFlagRequired("allow-target")
+	f.StringVar(&kubeConfig, "kubernetes-config", "", "Kubernetes executor config JSON (enables Jobs)")
 	run := &cobra.Command{Use: "run"}
 	run.AddCommand(historyCommand(o))
 	var planFile, request, source, executor string
@@ -145,7 +157,7 @@ func serverCommands(root *cobra.Command, o *Options) {
 	f.StringVar(&planFile, "plan", "", "Plan file")
 	f.StringVar(&request, "request-id", "", "Stable ID reused on retry")
 	f.StringVar(&source, "source", "human", "human, agent or ci")
-	f.StringVar(&executor, "executor", "local", "Execution backend (local)")
+	f.StringVar(&executor, "executor", "local", "Execution backend (local or kubernetes)")
 	_ = start.MarkFlagRequired("plan")
 	_ = start.MarkFlagRequired("request-id")
 	run.AddCommand(start)

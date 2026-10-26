@@ -23,6 +23,9 @@ func VerifyEvidence(b artifact.Bundle) error {
 			if err != nil {
 				return err
 			}
+			if e = fio.VerifyPlan(raw, b.Run.Plan, t.Point); e != nil {
+				return e
+			}
 			metrics, e = fio.Parse(raw)
 		} else {
 			if b.Run.ToolVersion != "mdtest-4.0.0" {

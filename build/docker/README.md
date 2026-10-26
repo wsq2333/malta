@@ -1,12 +1,30 @@
-# 容器镜像规划
+# Server and Runner images
 
-状态：仅预留目录，尚无 Dockerfile 或可拉取的 Malta 镜像。
+Build the embedded frontend, then Linux binaries into `build/output/`:
 
-- `Dockerfile.server`：规划构建 Go 服务与前端静态资源，运行 `malta serve`。
-- `Dockerfile.runner`：规划包含 Malta CLI 和固定版本 fio；后续按需要增加元数据工具、MPI 等依赖。
+```sh
+(cd web && pnpm install --frozen-lockfile && pnpm build)
+for arch in amd64 arm64; do
+  CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath \
+    -o build/output/malta-linux-$arch ./cmd/malta
+done
+```
 
-镜像运行时不包含模型推理服务。记录 Malta、工具与基础镜像版本，以 digest 固定实验环境；CPU 架构不同的镜像分别验证。Runner 用前台进程正确接收终止信号，结果通过挂载目录保存。
+The Server additionally needs `kubectl-linux-<arch>` (1.35.0). Download from
+`https://dl.k8s.io/release/v1.35.0/bin/linux/<arch>/kubectl`, verify against
+`kubectl-checksums.json`, and set executable permissions. S7's release script
+will automate these steps.
 
-构建验收覆盖：启动、工具版本、最小测试、终止与结果导出；实际支持架构和发布仓库待实现时确定。
+```sh
+docker build -f build/docker/Dockerfile.server -t malta-server:local .
+docker build -f build/docker/Dockerfile.runner -t malta-runner:local .
+```
 
-关联：[Kubernetes 运行规划](../../deploy/kubernetes/README.md)。
+`BASE_IMAGE` can point to a mirror of the **same digest**. The base manifest is
+pinned; fio is fixed to Debian `3.33-3`. OS dependency updates can change image
+bytes; capture each produced image digest and use that digest in executor configs.
+Do not claim that apt-based images are byte-for-byte reproducible across dates.
+
+The Server includes UI and kubectl; Runner includes fio and the same Malta binary.
+Both run as UID/GID 10001 with Malta as PID 1 to receive SIGTERM. No model runtime,
+Kubernetes credentials, mounting privileges or workload data is baked into images.
