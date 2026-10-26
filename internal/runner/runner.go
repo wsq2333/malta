@@ -15,6 +15,7 @@ import (
 )
 
 type Options struct {
+	Native   string
 	Fio      string
 	Timeout  time.Duration
 	MaxBytes int64
@@ -117,14 +118,19 @@ func Execute(ctx context.Context, r domain.Run, out string, o Options) (result d
 	if e = update(); e != nil {
 		return result, e
 	}
-	v, e := exec.CommandContext(ctx, o.Fio, "--version").CombinedOutput()
-	_ = os.WriteFile(filepath.Join(out, "tool-version.txt"), v, 0644)
-	if e != nil {
-		return result, domain.E("execution", "fio version check failed: "+e.Error())
+	if result.Plan.Spec.Scenario == nil || domain.ScenarioUsesFio(result.Plan.Spec.Scenario) {
+		v, e := exec.CommandContext(ctx, o.Fio, "--version").CombinedOutput()
+		_ = os.WriteFile(filepath.Join(out, "tool-version.txt"), v, 0644)
+		if e != nil {
+			return result, domain.E("execution", "fio version check failed: "+e.Error())
+		}
+		result.ToolVersion = strings.TrimSpace(string(v))
+		if e = fio.CheckVersion(result.ToolVersion); e != nil {
+			return result, e
+		}
 	}
-	result.ToolVersion = strings.TrimSpace(string(v))
-	if e = fio.CheckVersion(result.ToolVersion); e != nil {
-		return result, e
+	if result.Plan.Spec.Scenario != nil {
+		result.ToolVersion = domain.ScenarioTools(result.Plan.Spec.Scenario)
 	}
 	if e = domain.Write(filepath.Join(out, "plan.json"), r.Plan); e != nil {
 		return result, e
@@ -137,7 +143,7 @@ func Execute(ctx context.Context, r domain.Run, out string, o Options) (result d
 		return result, e
 	}
 	if result.Plan.Spec.Scenario != nil {
-		err := executeScenario(ctx, &result, out, dataDir, o.Fio, update)
+		err := executeScenario(ctx, &result, out, dataDir, o, update)
 		return result, err
 	}
 	for _, p := range result.Plan.Trials {

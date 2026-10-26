@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/engine/fio"
+	"github.com/wsq2333/malta/internal/engine/native"
 	"os"
 	"path/filepath"
 	"sync"
@@ -28,10 +29,69 @@ func fioPhase(ctx context.Context, plan domain.Plan, point domain.Point, data, o
 	defer stderr.Close()
 	return process(ctx, bin, args, stdout, stderr)
 }
-func executeScenario(ctx context.Context, result *domain.Run, out, data, bin string, update func() error) error {
+func executeScenario(ctx context.Context, result *domain.Run, out, data string, options Options, update func() error) error {
+	bin := options.Fio
 	sc := result.Plan.Spec.Scenario
 	for repeat := 1; repeat <= sc.Repeats; repeat++ {
 		for _, stage := range sc.Stages {
+			if stage.Native() {
+				result.Status = "running"
+				result.Attempt.Status = "running"
+				if err := update(); err != nil {
+					return err
+				}
+				request := native.Request{Plan: result.Plan, Repeat: repeat, StageID: stage.ID, DataDir: data, OutDir: out}
+				input := filepath.Join(out, fmt.Sprintf("native-r%d-%s.json", repeat, stage.ID))
+				if err := domain.Write(input, request); err != nil {
+					return err
+				}
+				binary := options.Native
+				if binary == "" {
+					var err error
+					binary, err = os.Executable()
+					if err != nil {
+						return err
+					}
+				}
+				stdout, err := os.Create(input + ".stdout")
+				if err != nil {
+					return err
+				}
+				stderr, err := os.Create(input + ".stderr")
+				if err != nil {
+					stdout.Close()
+					return err
+				}
+				err = process(ctx, binary, []string{"internal-native", "--input", input}, stdout, stderr)
+				stdout.Close()
+				stderr.Close()
+				if err != nil {
+					return fmt.Errorf("native stage %s: %w", stage.ID, err)
+				}
+				measured := []domain.Trial{}
+				for _, p := range result.Plan.Trials {
+					if p.Repeat != repeat || p.StageID != stage.ID {
+						continue
+					}
+					var evidence native.Evidence
+					if err = domain.Read(filepath.Join(out, p.ID, "native.json"), &evidence); err != nil {
+						return err
+					}
+					t, e := native.Parse(evidence, stage, p)
+					if e != nil {
+						return e
+					}
+					measured = append(measured, t)
+				}
+				if err = domain.ValidateStageWindow(stage, measured); err != nil {
+					return err
+				}
+				result.Trials = append(result.Trials, measured...)
+				if err = update(); err != nil {
+					return err
+				}
+				continue
+			}
 			points := []domain.Point{}
 			for _, p := range result.Plan.Trials {
 				if p.Repeat == repeat && p.StageID == stage.ID {

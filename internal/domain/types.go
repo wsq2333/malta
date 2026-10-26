@@ -284,7 +284,7 @@ type Metric struct {
 }
 
 func (m Metric) Validate() error {
-	units := map[string]string{"throughput": "bytes/s", "iops": "ops/s", "clat_p99": "ns", "metadata_rate": "ops/s"}
+	units := map[string]string{"throughput": "bytes/s", "iops": "ops/s", "clat_p99": "ns", "metadata_rate": "ops/s", "latency_p99_upper": "ns"}
 	unit, known := units[m.Name]
 	if !known || unit != m.Unit || m.Operation == "" || math.IsNaN(m.Value) || math.IsInf(m.Value, 0) || m.Value < 0 {
 		return E("invalid", "invalid metric name/unit/value")
@@ -292,7 +292,14 @@ func (m Metric) Validate() error {
 	return nil
 }
 
+type Activity struct {
+	Submitted uint64 `json:"submitted"`
+	Succeeded uint64 `json:"succeeded"`
+	Errors    uint64 `json:"errors"`
+	Late      uint64 `json:"late"`
+}
 type Trial struct {
+	Activity   *Activity `json:"activity,omitempty"`
 	Point      Point     `json:"point"`
 	Status     string    `json:"status"`
 	StartedAt  time.Time `json:"started_at"`

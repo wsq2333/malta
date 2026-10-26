@@ -6,6 +6,7 @@ import (
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/engine/fio"
 	"github.com/wsq2333/malta/internal/engine/metadata"
+	"github.com/wsq2333/malta/internal/engine/native"
 	"time"
 )
 
@@ -13,6 +14,35 @@ func VerifyEvidence(b artifact.Bundle) error {
 	for _, t := range b.Run.Trials {
 		if t.Status != "succeeded" {
 			continue
+		}
+		if b.Run.Plan.Spec.Scenario != nil {
+			if b.Run.ToolVersion != domain.ScenarioTools(b.Run.Plan.Spec.Scenario) {
+				return domain.E("unsupported", "scenario tool identity differs")
+			}
+			var stage domain.Stage
+			for _, s := range b.Run.Plan.Spec.Scenario.Stages {
+				if s.ID == t.Point.StageID {
+					stage = s
+				}
+			}
+			if stage.Native() {
+				raw, e := artifact.Get(b, t.Point.ID+"/native.json")
+				if e != nil {
+					return e
+				}
+				var evidence native.Evidence
+				if e = domain.Decode(raw, &evidence); e != nil {
+					return e
+				}
+				expected, e := native.Parse(evidence, stage, t.Point)
+				if e != nil {
+					return e
+				}
+				if domain.Hash(expected) != domain.Hash(t) {
+					return domain.E("invalid", "native trial differs from raw evidence")
+				}
+				continue
+			}
 		}
 		var metrics []domain.Metric
 		var e error
@@ -37,7 +67,7 @@ func VerifyEvidence(b artifact.Bundle) error {
 					return domain.E("invalid", "trial window exceeds requested duration")
 				}
 			}
-			if b.Run.ToolVersion != "fio-3.33" {
+			if b.Run.Plan.Spec.Scenario == nil && b.Run.ToolVersion != "fio-3.33" {
 				return domain.E("unsupported", "unvalidated fio version")
 			}
 			raw, err := artifact.Get(b, t.Point.ID+"/measure.json")
@@ -68,7 +98,7 @@ func VerifyEvidence(b artifact.Bundle) error {
 	if b.Run.Status == "succeeded" && b.Run.Plan.Spec.Scenario != nil {
 		for repeat := 1; repeat <= b.Run.Plan.Spec.Repeats; repeat++ {
 			for _, stage := range b.Run.Plan.Spec.Scenario.Stages {
-				if stage.Mode != "parallel" {
+				if stage.Mode != "parallel" && stage.Mode != "weighted" {
 					continue
 				}
 				trials := []domain.Trial{}

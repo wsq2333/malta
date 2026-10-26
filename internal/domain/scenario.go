@@ -2,8 +2,10 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"time"
 )
 
@@ -18,7 +20,13 @@ type ScenarioSpec struct {
 	FailurePolicy string  `json:"failure_policy"`
 	Stages        []Stage `json:"stages"`
 }
+type Mix struct {
+	Basis   string         `json:"basis"`
+	Weights map[string]int `json:"weights"`
+	Seed    int64          `json:"seed"`
+}
 type Stage struct {
+	Mix            *Mix               `json:"mix,omitempty"`
 	ID             string             `json:"id"`
 	Mode           string             `json:"mode"`
 	WarmupSeconds  int                `json:"warmup_seconds"`
@@ -27,6 +35,7 @@ type Stage struct {
 	Workloads      []ScenarioWorkload `json:"workloads"`
 }
 type ScenarioWorkload struct {
+	Engine   string   `json:"engine,omitempty"`
 	ID       string   `json:"id"`
 	Kind     string   `json:"kind"`
 	NumJobs  int      `json:"numjobs"`
@@ -45,11 +54,18 @@ func (s ScenarioSpec) Validate() error {
 			return E("invalid", "stage IDs must be unique lowercase identifiers (max 32 characters)")
 		}
 		seen[stage.ID] = true
-		if stage.Mode != "sequential" && stage.Mode != "parallel" {
+		if stage.Mode != "sequential" && stage.Mode != "parallel" && stage.Mode != "weighted" {
 			return E("unsupported", "scenario mode is not supported")
 		}
 		if stage.DatasetPolicy != "isolated_per_workload" || len(stage.Workloads) == 0 || len(stage.Workloads) > 16 {
 			return E("invalid", "require isolated datasets and 1..16 workloads per stage")
+		}
+		if stage.Mode == "weighted" {
+			if stage.Mix == nil || stage.Mix.Basis != "operations" || len(stage.Mix.Weights) != len(stage.Workloads) {
+				return E("invalid", "weighted stage requires one positive operations weight per workload")
+			}
+		} else if stage.Mix != nil {
+			return E("invalid", "mix is only valid for weighted stages")
 		}
 		children := map[string]bool{}
 		workers := 0
@@ -63,6 +79,18 @@ func (s ScenarioSpec) Validate() error {
 			}
 			if w.Workload.RuntimeSeconds != 0 || w.Workload.WarmupSeconds != 0 {
 				return E("invalid", "duration belongs to the stage, not the workload")
+			}
+			if stage.Mode == "weighted" {
+				if w.Engine != "native" || stage.Mix.Weights[w.ID] < 1 || stage.Mix.Weights[w.ID] > 10000 {
+					return E("invalid", "weighted workloads require native engine and weights 1..10000")
+				}
+			} else if w.Engine != "" && w.Engine != "fio" {
+				return E("unsupported", "this mode requires fio engine")
+			}
+			if w.Engine == "native" {
+				if w.Workload.Direct || w.IODepth != 1 || w.Workload.IOEngine != "psync" || w.Workload.FsyncEvery != 0 || w.Workload.BlockSizeBytes > 1<<20 || w.Workload.FilesPerJob*w.NumJobs > 64 || w.Workload.CacheState != "warm" {
+					return E("unsupported", "native v1 requires buffered psync, depth 1, warm cache intent, no fsync, <=1MiB blocks and <=64 files per workload")
+				}
 			}
 			spec := w.Spec(stage)
 			if err := spec.Validate(); err != nil {
@@ -134,7 +162,12 @@ func (p Plan) Budget() (int64, int64) {
 	for _, point := range p.Trials {
 		child, _ := p.WorkloadPlan(point)
 		w := child.Spec.Workload
-		bytes += w.FileSizeBytes * int64(w.FilesPerJob) * int64(point.NumJobs)
+		amount := w.FileSizeBytes * int64(w.FilesPerJob) * int64(point.NumJobs)
+		if amount > math.MaxInt64-bytes {
+			bytes = math.MaxInt64
+		} else {
+			bytes += amount
+		}
 	}
 	if p.Spec.Scenario == nil {
 		seconds = int64(len(p.Trials)) * int64(p.Spec.Workload.RuntimeSeconds+p.Spec.Workload.WarmupSeconds)
@@ -171,4 +204,40 @@ func ValidateStageWindow(stage Stage, trials []Trial) error {
 		return E("invalid", "parallel measurement windows overlap less than 50% of requested runtime")
 	}
 	return nil
+}
+
+func (s Stage) Native() bool { return len(s.Workloads) > 0 && s.Workloads[0].Engine == "native" }
+func ScenarioTools(s *ScenarioSpec) string {
+	fio, native := false, false
+	for _, stage := range s.Stages {
+		if stage.Native() {
+			native = true
+		} else {
+			fio = true
+		}
+	}
+	if fio && native {
+		return "fio-3.33+malta-native-1"
+	}
+	if native {
+		return "malta-native-1"
+	}
+	return "fio-3.33"
+}
+func ScenarioUsesFio(s *ScenarioSpec) bool {
+	for _, stage := range s.Stages {
+		if !stage.Native() {
+			return true
+		}
+	}
+	return false
+}
+func NativeOperations(w ScenarioWorkload) []string {
+	if w.Workload.Operation == "randrw" {
+		return []string{"read", "write"}
+	}
+	if slices.Contains([]string{"read", "randread"}, w.Workload.Operation) {
+		return []string{"read"}
+	}
+	return []string{"write"}
 }

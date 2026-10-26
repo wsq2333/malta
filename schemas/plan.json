@@ -114,6 +114,29 @@
         "iodepth"
       ]
     },
+    "Mix": {
+      "properties": {
+        "basis": {
+          "type": "string"
+        },
+        "weights": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "basis",
+        "weights",
+        "seed"
+      ]
+    },
     "Plan": {
       "properties": {
         "schema_version": {
@@ -227,6 +250,9 @@
     },
     "ScenarioWorkload": {
       "properties": {
+        "engine": {
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -335,6 +361,9 @@
     },
     "Stage": {
       "properties": {
+        "mix": {
+          "$ref": "#/$defs/Mix"
+        },
         "id": {
           "type": "string"
         },

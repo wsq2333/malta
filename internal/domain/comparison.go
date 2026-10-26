@@ -155,7 +155,7 @@ func Compare(a, b Run) Comparison {
 	for _, s := range am {
 		v := lookup[s.Key]
 		d := Delta{Baseline: s, Candidate: v, Direction: "higher-is-better"}
-		if s.Metric == "clat_p99" {
+		if s.Metric == "clat_p99" || s.Metric == "latency_p99_upper" {
 			d.Direction = "lower-is-better"
 		}
 		if s.Median != 0 {

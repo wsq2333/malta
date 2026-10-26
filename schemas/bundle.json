@@ -3,6 +3,30 @@
   "$id": "https://malta.local/schemas/bundle.json",
   "$ref": "#/$defs/Bundle",
   "$defs": {
+    "Activity": {
+      "properties": {
+        "submitted": {
+          "type": "integer"
+        },
+        "succeeded": {
+          "type": "integer"
+        },
+        "errors": {
+          "type": "integer"
+        },
+        "late": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "submitted",
+        "succeeded",
+        "errors",
+        "late"
+      ]
+    },
     "Attempt": {
       "properties": {
         "job_name": {
@@ -251,6 +275,29 @@
         "source"
       ]
     },
+    "Mix": {
+      "properties": {
+        "basis": {
+          "type": "string"
+        },
+        "weights": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "basis",
+        "weights",
+        "seed"
+      ]
+    },
     "Plan": {
       "properties": {
         "schema_version": {
@@ -432,6 +479,9 @@
     },
     "ScenarioWorkload": {
       "properties": {
+        "engine": {
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -540,6 +590,9 @@
     },
     "Stage": {
       "properties": {
+        "mix": {
+          "$ref": "#/$defs/Mix"
+        },
         "id": {
           "type": "string"
         },
@@ -575,6 +628,9 @@
     },
     "Trial": {
       "properties": {
+        "activity": {
+          "$ref": "#/$defs/Activity"
+        },
         "point": {
           "$ref": "#/$defs/Point"
         },
