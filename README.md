@@ -1,153 +1,236 @@
 # Malta
 
-Malta is a benchmarking and visualization platform for distributed file systems, designed to establish reproducible performance baselines and compare performance limits across dates, versions, and configurations through an intuitive web UI. Future plans include agent-assisted analysis and bottleneck diagnosis.
+**Agent 增强与管理的分布式文件系统性能对照平台。**
 
-Malta（马耳他）致力于让分布式文件系统的性能测试可重复、可追溯、可比较。项目名称取自地中海岛国马耳他。
+Malta is an agent-enhanced platform for orchestrating, managing, and comparing distributed file system benchmarks. It combines a scriptable CLI, reproducible data and metadata baselines, and a visual workspace to compare performance across versions, dates, and hardware environments, with planned Kubernetes execution and evidence-based agent analysis.
 
-> **项目状态：设计阶段。** 当前仓库包含项目说明与架构规划，尚无可运行的 CLI、服务或 UI。下文中的能力、目录和命令均为实现目标。
+Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共用一套 CLI、测试定义和结果契约，完成“制定计划 → 执行测试 → 管理运行 → 对照基线 → 分析证据”。项目名称取自地中海岛国马耳他。
 
-## 要解决的问题
+> **状态：设计阶段。** 当前包含 README、架构与测试方法文档，以及 skill、Kubernetes 和镜像构建的目录说明。UI 为交互草图；CLI、API、压测执行器、可安装 skill 与部署清单均未实现。下文命令和目录树描述目标设计。
 
-性能测试不应只有一张截图或一个最大吞吐数字。Malta 希望回答：
+## 平台定位
 
-- 相同测试条件下，新版本相较基线有多少提升或回退？
-- 随客户端并发增加，吞吐量、IOPS 和尾延迟如何变化？
-- 在约定的延迟和错误率约束下，当前配置能达到怎样的性能上限？
-- 某一天的异常来自版本、环境、缓存还是负载变化？有哪些证据可以复查？
+Malta 管理性能实验及其证据，回答以下问题：
 
-“性能上限”指指定环境、负载和测试范围内观测到的上限。单客户端结果不能直接代表整个分布式集群的极限。
+- 相同环境下，不同版本和日期的数据、元数据性能有何变化？
+- 不同文件大小、I/O 块大小、读写方式和并发下，吞吐、IOPS、尾延迟如何变化？
+- 同一版本在不同云环境、实例类型或物理机上的表现如何？
+- 在指定延迟与错误率约束下，当前测试范围内的最佳性能是多少？
+- Agent 能否自动选择负载、跟踪运行，并依据原始结果解释差异、提出下一轮验证方案？
 
-## 核心能力规划
+平台由三类入口组成：**CLI 负责执行与管理，UI 负责浏览与对照，Agent 通过 skill 调用相同能力**。Agent 从首版接口设计开始参与，自动分析能力逐步完善。
 
-| 能力 | 内容 | 阶段 |
-| --- | --- | --- |
-| 可重复测试 | 声明式负载、环境快照、工具版本、原始结果留存 | MVP |
-| 基线管理 | 选定不可变的测试结果作为基线，按负载和环境匹配 | MVP |
-| 历史与版本对比 | 按测试日期、文件系统版本、配置筛选，展示差异及波动 | MVP |
-| 并发阶梯测试 | 扫描进程数和队列深度，绘制吞吐与延迟曲线 | MVP：单客户端 |
-| 多客户端测试 | 协调启动、采集各客户端结果，分析集群扩展性 | 后续 |
-| 元数据性能 | 创建、查询、删除等操作的性能测试 | 后续 |
-| Agent 分析 | 基于结构化结果与原始证据解释回退、提出验证建议 | 后续 |
+## 性能基线与管理维度
 
-首版面向 **Linux 客户端上已挂载的 POSIX 文件系统路径**，由使用者完成文件系统部署和挂载。Curvine、JuiceFS 等可作为候选测试对象，实际支持范围以客户端接口及测试验证为准；HDFS、S3 等其他访问接口需要独立适配。
+### 数据性能
+
+覆盖顺序读、顺序写、随机读、随机写、混合读写。文件大小与 I/O 块大小独立建模，例如“1 GiB 文件上的 4 KiB 随机读”不同于“4 KiB 小文件读取”。
+
+负载定义记录单文件大小、文件数、总工作集、块大小、读写比例、文件共享方式、进程数、队列深度、I/O 引擎、预热与测量时长。记录 buffered/direct I/O、缓存状态、同步与持久化语义，混合负载分别报告读写指标。
+
+### 元数据性能
+
+将 create、stat、unlink、mkdir、rmdir、rename、readdir 等操作作为独立基线，记录对象总量、每目录条目数、目录深度、共享目录争用和并发数。以 ops/s 及工具实际提供的延迟指标展示；没有采集的操作和分位数明确标记缺失。
+
+首版设计同时覆盖数据与元数据的结果模型和 UI。执行适配先落地 fio；元数据从经验证的结果导入开始，再逐步接入 mdtest 及其他工具，不假定一个工具支持全部操作。
+
+### 版本与硬件环境
+
+| 维度 | 管理内容 |
+| --- | --- |
+| 软件版本 | 文件系统名称、release/tag、commit、构建或镜像 digest、客户端与服务端版本 |
+| 云环境 | 云厂商、region/AZ、实例类型、CPU 架构、云盘类型及容量/性能配置、网络限制 |
+| 物理机 | 厂商与机型、CPU、内存、磁盘、网卡、机房与拓扑 |
+| 配置快照 | 客户端、数据/元数据服务端各自的机型与节点数，挂载参数、副本与缓存配置 |
+| Kubernetes | cluster、namespace、Pod/Job UID、节点、资源 requests/limits、PVC/StorageClass、CSI 驱动及版本 |
+| 运行身份 | run_id、attempt_id、UTC 时间、工具与 Malta 版本、调用来源及计划摘要 |
+
+每套基线绑定 **版本 × 环境快照 × 负载定义**，并指向确定的 Run/Trial。硬件或拓扑变更产生新快照。跨版本对比固定环境与负载；跨硬件对比明确标记为硬件实验，不能将其差异直接归因于版本。
 
 ## 技术方案
 
-| 层次 | 建议选型 | 选择理由 |
+| 层次 | 选型 | 职责 |
 | --- | --- | --- |
-| CLI、Runner、HTTP API、比较逻辑 | Go | 统一实现进程控制、结果解析与服务端逻辑，便于在 Linux 测试节点部署 |
-| Web UI | TypeScript + React + Vite | 适合实现筛选、交互图表和多运行对比，静态构建产物可随服务发布 |
-| 图表 | Apache ECharts | 用于历史趋势、并发曲线、延迟分布及热力图 |
-| 测试引擎 | fio；后续接入 IOR / mdtest | 复用成熟工具，Malta 负责测试组织、数据规范和分析 |
-| 元数据与摘要 | SQLite，后续按需引入 PostgreSQL | MVP 使用单服务实例，降低部署复杂度；多服务实例再迁移 |
-| 原始结果与日志 | 本地 artifact 目录，后续支持对象存储 | 保留可复查证据，避免大文件直接进入关系数据库 |
-| 数据契约 | JSON Schema + OpenAPI | 规范结果格式与 API，供 UI 和后续 Agent 共用 |
+| CLI、API、Runner、比较逻辑 | Go | 统一执行入口、生命周期管理、结果解析与服务端判断 |
+| UI | TypeScript + React + Vite | 版本、环境、负载筛选及交互对比 |
+| 图表 | Apache ECharts | 历史趋势、并发曲线、延迟分布 |
+| 测试引擎 | fio；逐步接入 IOR / mdtest 等 | 生成负载，Malta 负责组织与标准化 |
+| 摘要与索引 | SQLite；按需扩展 PostgreSQL | 单服务实例起步，避免提前引入复杂依赖 |
+| 原始证据 | 本地 artifact 目录；逐步扩展对象存储 | 保存配置、输出、日志与校验和 |
+| 接口契约 | JSON Schema + OpenAPI | CLI、UI、Agent 共用稳定的数据语义 |
+| 集群执行 | Kubernetes Job + 已有 PVC/CSI | Pod 内运行测试，记录调度与挂载条件 |
 
-首版只引入 **Go 和 TypeScript 两种主要开发语言**。Python 可用于后续独立分析实验，但不作为服务运行的必需依赖。Rust/C++ 仅在确实需要自研压测引擎时重新评估。
+Go 服务计划嵌入构建后的前端资源。Runner 镜像包含固定版本的测试工具；模型服务、Agent 运行时和 Node.js 不作为压测进程的运行依赖。Python 可用于独立分析实验。
 
-Malta 的 Go 进程负责调度外部工具，不参与逐次文件 I/O；基准结果仍需验证工具本身及采集行为的开销。语言取舍与模块边界见 [架构设计](docs/architecture.md)。
-
-## 整体流程
+## 架构与执行流程
 
 ```mermaid
 flowchart LR
-    Spec[负载定义与环境快照] --> Runner[Go Runner]
-    Runner --> Tool[fio / 后续 IOR 与 mdtest]
-    Tool --> FS[被测文件系统挂载点]
-    Tool --> Raw[原始结果与日志]
-    Raw --> Normalize[解析与校验]
-    Normalize --> Store[结果索引与摘要]
-    Store --> API[查询与比较 API]
-    Raw --> API
-    API --> UI[Web UI]
-    API -. 后续只读接入 .-> Agent[分析 Agent]
+    User[工程师] --> CLI[Malta CLI]
+    Agent[Agent + Skill] --> CLI
+    CLI --> Plan[验证后的执行计划]
+    Plan --> Control[运行管理 / API]
+    Control --> Local[本地 Runner]
+    Control --> Job[Kubernetes Job / Runner Pod]
+    Local --> Tool[fio / 元数据工具]
+    Job --> Tool
+    Tool --> Target[POSIX 路径 / PVC 挂载点]
+    Tool --> Results[结果包与原始证据]
+    Results --> Store[导入 / 结果索引]
+    Store --> Compare[比较与趋势 API]
+    Compare --> UI[Web UI]
+    Compare --> CLI
+    CLI --> Agent
 ```
 
-MVP 采用单仓库、模块化单体：一个 `malta` 可执行文件提供测试、导入和服务入口。测试数据路径与 Malta 的数据库、日志路径分离。生产发布计划嵌入前端静态资源，运行时无需 Node.js；fio 等测试工具仍需单独安装。
+采用单仓库、模块化单体。共享服务管理 Run 和状态，执行后端分为 local 与 kubernetes。`local` 指服务所在测试节点，不隐式代表远程 CLI 所在机器。离线执行另提供前台 `exec` 入口，输出可移植结果包后再导入。
 
-## Benchmark 设计
+## CLI：人和 Agent 共用的操作入口
 
-首批负载覆盖大块顺序读写、小块随机读写及固定比例混合读写。每种负载固定数据集、块大小、I/O 引擎、缓存策略和持久化语义，再扫描进程数或队列深度。
+以下为接口草案，尚不能执行。
 
-每份结果至少记录：
-
-- **身份**：运行 ID、UTC 时间、文件系统版本/commit、Malta 与测试工具版本。
-- **环境**：客户端与服务端配置、CPU/内存、磁盘、网络、节点数量、挂载参数。
-- **负载**：读写模式、块大小、文件布局、数据量、并发、队列深度、预热与测量时长、随机种子。
-- **语义**：缓存状态、buffered/direct I/O、同步策略、压缩与去重相关的数据生成方式。
-- **结果**：读写分别统计的吞吐量、IOPS、延迟类型及分位数、错误、实际测量时长和重复实验结果。
-- **证据**：解析前的工具输出、执行参数、日志、配置摘要与 artifact 校验和。
-
-同一负载点建议独立重复至少 3 次，保留全部结果，展示中位数及离散程度；具体次数和时长由测试方案确定。失败或不完整的测试不能作为零值计入基线，缺失指标显示为缺失。
-
-版本对比允许版本变化，但必须检查其他条件。环境信息不完整或存在未控制差异时，应展示差异并标记可比性不足。延迟分位数不能直接求平均充当聚合分位数。详细规则见 [测试方法](docs/benchmark-methodology.md)。
-
-## UI 规划
-
-| 页面 | 主要内容 |
+| 命令组 | 预期功能 |
 | --- | --- |
-| Runs | 按日期、文件系统、版本、负载、环境与状态查找测试 |
-| Run detail | 配置与环境、重复实验分布、指标摘要、原始结果和错误信息 |
-| Compare | 选择基线与候选，先查看可比性和配置差异，再看性能差异 |
-| Trends & limits | 同条件历史趋势、并发—吞吐/IOPS 曲线、并发—P99 曲线及约束内最佳点 |
+| `malta plan` | 校验负载、目标与环境，展开参数矩阵，生成不可变执行计划；不发起 I/O |
+| `malta run start` | 提交计划，返回 run_id；支持 local/kubernetes executor 与幂等 request-id |
+| `malta run list/get` | 查询任务、attempt、状态、错误和结果引用 |
+| `malta run logs/wait` | 获取日志、等待终态；等待超时不意味着测试已取消 |
+| `malta run cancel` | 请求停止任务并清理测试进程，保留结果与证据 |
+| `malta exec` | 在当前机器或 Pod 前台执行已验证计划，写出结果包 |
+| `malta result import/export` | 校验、导入或导出结果包，重复导入保持幂等 |
+| `malta baseline list/set` | 查询或创建基线版本，保留旧引用 |
+| `malta compare` | 对比指定基线与候选，返回可比性、差异与证据 |
+| `malta environment register/list/show` | 登记或查看云、物理机、集群及配置快照 |
+| `malta version register/list/show` | 登记或查看 release、commit、构建与版本身份 |
+| `malta serve` | 启动运行管理、API 与 UI |
 
-图表和表格共享同一套服务端比较结果。时间统一存为 UTC，界面明确显示展示时区；吞吐单位区分 MB/s 与 MiB/s。单次异常不自动标为确定的性能回退。
+```sh
+# 接口草案：文件名与 ID 为占位，相关模板尚未实现
+malta plan --spec benchmarks/data/seq-read.yaml --environment environments/cloud/example.yaml --target /bench/malta --output plan.json --format json --non-interactive
+malta run start --plan plan.json --executor kubernetes --server http://127.0.0.1:8080 --request-id experiment-001 --format json --non-interactive
+malta run get RUN_ID --server http://127.0.0.1:8080 --format json
+malta run wait RUN_ID --server http://127.0.0.1:8080 --timeout 30m --format json
+malta run cancel RUN_ID --server http://127.0.0.1:8080 --format json --non-interactive
+malta compare --baseline BASELINE_ID --candidate RUN_ID --server http://127.0.0.1:8080 --format json
+
+# Pod 内或本地离线执行：前台运行，无需运行管理服务
+malta exec --plan /etc/malta/plan.json --output /results --format json --non-interactive
+```
+
+自动化契约：
+
+- `--format json` 输出版本化结构；stdout 仅包含机器可读结果，诊断信息写 stderr。流式日志单独定义 NDJSON 格式。
+- `--non-interactive` 不弹交互提示；缺少必需配置时返回结构化错误。计划固定目标路径、资源、时长与数据规模，提交时重新验证环境和挂载。
+- 同一 request-id 与相同计划返回同一逻辑运行；同一 ID 对应不同计划返回冲突。创建和结果导入的幂等性不代表底层 I/O 恰好执行一次。
+- 固定退出码区分参数/契约错误、执行失败、等待超时和取消；比较发现性能差异与 CLI 自身出错分别表达。
+- 后台生命周期由服务或 Kubernetes 管理，不依赖 Agent 的会话存活。运行状态与结果导入状态分开记录，测试成功不代表证据已经持久保存。
+
+## Agent skills
+
+[`skills/`](skills/README.md) 保存项目随仓库版本发布的 Agent 操作说明，规划 `malta-benchmark`、`malta-analysis` 两类 skill。当前只预留目录与约定；待 CLI 契约实现后添加可安装的 `SKILL.md`、参考资料和可验证示例。
+
+测试 skill 指导 Agent 读取需求、选择模板和环境、生成计划、发起测试、查询/取消、收集结果与建立对照。分析 skill 负责解释变化、引用具体运行与指标、提出后续实验。
+
+Agent 在已配置的测试环境、资源额度和目标目录内执行，记录调用来源、request-id、计划与运行引用。用户已经授权的测试范围内无需反复交互确认；超出范围返回明确错误。基线晋升遵循项目显式策略，不能用一次异常运行覆盖历史基线。分析报告与原始测量分开存储，区分事实、推断和建议。
+
+Skill 调用标准 CLI，不另建一套测试逻辑，也不绑定特定模型供应商。
+
+## Kubernetes 执行与挂载
+
+[`deploy/kubernetes/`](deploy/kubernetes/README.md) 预留运行管理服务、Runner Job、RBAC 与环境 overlays；[`build/docker/`](build/docker/README.md) 预留 server/runner 镜像构建。
+
+- **服务**：Deployment + Service 提供运行管理、API 和 UI。首版 SQLite 单副本，数据库使用独立、支持其锁语义的本地或块存储文件系统，不能放到被测分布式文件系统上。
+- **测试**：Job 创建 Runner Pod，复用已有 PVC 和 CSI 挂载，在独立测试子目录中执行。文件系统部署、CSI 安装和 PVC 准备由环境配置负责。
+- **挂载**：`/bench` 为被测卷，`/etc/malta` 为只读计划，`/results` 为独立结果卷或上传暂存区。结果不得只依赖 Pod 可消失的临时盘。
+- **调度**：配置 namespace、节点选择、亲和性、资源 requests/limits 和 deadline，记录实际节点、镜像 digest、挂载与资源限制。执行前检查 PVC 访问模式和拓扑能否满足目标 Pod 数。
+- **权限**：提交端与执行 Pod 分离身份。提交端使用目标 namespace 的必要权限；仅操作挂载目录的 Pod 不自动获得 Kubernetes API 权限，也不默认使用 privileged 或 hostPath。
+- **重试**：起步采用 `restartPolicy: Never`、`backoffLimit: 0`，运行管理仍须处理重复启动、Pod 丢失和超时；每个 attempt 使用独立目录和身份，资源组协调避免重叠压测，不能把 Job 当作恰好一次执行保证。
+- **结果**：确认结果持久化/上传完成后再安排 TTL 清理；失败保留诊断。重复 attempt 不算独立的计划内重复实验。
+
+第一步支持单 Job / 单测试客户端；多 Pod 同步、多客户端时间对齐和全局聚合独立验收。参考 Kubernetes [Job](https://kubernetes.io/docs/concepts/workloads/controllers/job/)、[PV/PVC](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) 与 [ServiceAccount](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/) 文档。
+
+## UI 设计
+
+视觉参考 [JuiceFS 官网](https://cf.juicefs.com/zh-cn/) 的绿色、留白与圆角元素。当前确认的样式为纯白底，浅绿与薄荷绿点缀，辅以轻微网格和细线条。采用适合高密度数据阅读的表格和清晰层级，不复用其品牌图形。
+
+| 入口 | 主要内容 |
+| --- | --- |
+| 性能基线 | 文件 I/O / 元数据切换；文件大小、块大小、读写类型、版本与环境筛选；候选与基线并排 |
+| 版本管理 | release/commit/build、测试覆盖与各环境的基线入口 |
+| 硬件环境 | 云厂商 + 实例类型、物理机型号、客户端/服务端拓扑与不可变快照 |
+| 测试运行 | 来源（人工/Agent）、执行后端、Run/attempt 状态、日志、计划与结果证据 |
+| 对照与趋势 | 历史日期、版本变化、并发扫描及约束内最佳点；先展示可比性 |
+
+现有交互草图覆盖前三个入口，后两个入口为后续实现目标。Agent 发起的测试出现在相同运行列表中，分析报告挂在对应运行或对照记录下。
+
+## 测量与比较原则
+
+原始输出、负载定义、环境快照、执行参数和 artifact 哈希必须留存。同一参数点规划独立重复至少 3 次，展示中位数及波动；不完整与失败结果不能补成零值。
+
+吞吐区分 MB/s 与 MiB/s，读写分别统计，延迟区分 slat/clat/lat；分位数不能直接求平均当作全局分位数。元数据未报告的延迟保留缺失值。可比性检查区分允许的实验变量与未控制差异。
+
+性能极限是特定环境、负载、扫描范围与延迟/错误率约束下的观测结果。单客户端结果不能代表整个集群。详见 [测试方法](docs/benchmark-methodology.md)。
 
 ## 目录规划
 
-以下为目标结构；当前仅存在 README 与 `docs/` 下的设计文档，代码目录随对应功能实现创建。
+当前实际存在 `README.md`、`docs/`、`skills/README.md`、`deploy/kubernetes/README.md` 和 `build/docker/README.md`。其余路径为目标结构，随功能实现创建。
 
 ```text
 malta/
-├── cmd/malta/                  # CLI 入口
+├── cmd/malta/                     # 面向人和 Agent 的 CLI 入口
 ├── internal/
-│   ├── domain/                 # Run、负载、环境、指标等领域类型
-│   ├── runner/                 # 执行生命周期、超时、取消与结果收集
-│   ├── engine/fio/             # 参数生成、能力检查和输出解析
-│   ├── compare/                # 可比性检查、基线匹配与统计
-│   ├── store/                  # SQLite 查询、事务与 SQL migrations
-│   ├── artifact/               # 原始文件与校验和
-│   └── api/                    # HTTP 接口
-├── web/
-│   ├── src/                    # 页面、图表、API 客户端
-│   └── embed.go                # 嵌入构建后的静态资源
-├── api/openapi.yaml            # HTTP API 契约
-├── schemas/                    # 测试定义与结果的版本化 JSON Schema
-├── benchmarks/                 # 版本化负载模板，不存真实运行结果
-├── testdata/                   # 小型脱敏工具输出和解析预期
-├── tests/integration/          # 最小执行—导入—对比闭环验证
-├── docs/                       # 架构、方法与后续使用文档
-├── scripts/                    # 构建和开发辅助脚本
-└── go.mod                      # Go 模块与依赖
+│   ├── domain/                    # Plan、Run、Attempt、环境与指标
+│   ├── cli/                       # 命令、JSON 输出与退出码
+│   ├── runner/                    # 前台执行与子进程生命周期
+│   ├── executor/{local,kubernetes}/ # 后端提交、状态、取消与回收
+│   ├── engine/{fio,metadata}/     # 工具参数、能力与输出适配
+│   ├── compare/                   # 可比性、基线匹配和统计
+│   ├── store/                     # 索引、运行状态与 migrations
+│   ├── artifact/                  # 结果包、文件哈希与导入
+│   └── api/                       # 共用运行管理与查询服务
+├── web/                           # React UI 与静态资源嵌入
+├── api/openapi.yaml                # 版本化 HTTP API
+├── schemas/                       # 计划、结果包、CLI 输出契约
+├── benchmarks/{data,metadata}/     # 负载模板
+├── environments/{cloud,bare-metal,kubernetes}/ # 不含凭证的环境模板
+├── skills/
+│   ├── README.md                  # skill 约定与实现状态
+│   ├── malta-benchmark/SKILL.md    # 规划：执行与管理测试
+│   └── malta-analysis/SKILL.md     # 规划：对照与证据分析
+├── deploy/kubernetes/
+│   ├── README.md                  # 挂载与执行设计
+│   ├── base/                      # 规划：服务、身份与基础配置
+│   ├── jobs/                      # 规划：Runner Job 模板
+│   └── overlays/                  # 规划：环境差异与部署参数
+├── build/docker/                  # 镜像构建说明；后续 server/runner Dockerfile
+├── testdata/                      # 脱敏工具输出与预期
+├── tests/{integration,e2e}/        # CLI、API、UI、集群执行闭环
+├── docs/                          # 架构与测试方法
+├── scripts/                       # 构建和开发辅助
+└── go.mod                         # Go 依赖
 ```
 
 ## 实现路线
 
 | 阶段 | 交付内容 | 验收标准 |
 | --- | --- | --- |
-| M0：数据契约 | Run/result schema、fio 输出样例、单位和可比性规则 | 正确解析代表性输出；缺失、错误、不同单位有明确处理 |
-| M1：执行闭环 | 本地 Runner、fio、结果包、SQLite、导入和查询 | Linux 挂载路径完成一次最小测试；重复导入不重复计数；失败可追溯 |
-| M2：可视化 MVP | 四类页面、基线比较、历史趋势、单客户端并发扫描 | 两批真实测试可对比、可下载证据；环境差异与波动可见 |
-| M3：集群能力 | 多客户端协调、IOR/mdtest、可选监控对接 | 验证时间窗口和聚合规则；识别客户端与服务端瓶颈 |
-| M4：Agent | 只读查询接口、分析报告及证据引用 | 报告能回溯具体运行和指标，并区分观测、假设与建议 |
+| M0：契约 | Plan/Run/Attempt、CLI JSON、环境快照、数据/元数据结果 schema | Agent 可按 schema 生成计划；fixture 解析与可比性规则明确 |
+| M1：CLI 与执行 | local 执行、服务管理、fio、结果包、Agent 测试 skill | 非交互发起/查询/等待/取消；幂等提交；中断与失败可追溯 |
+| M2：平台 MVP | 基线 UI、版本/环境管理、基本元数据导入、单 Job PVC 挂载与镜像 | 同环境两批结果可对比；Pod 退出后证据仍可查询；Agent 可完成一次测试闭环 |
+| M3：集群测试 | 多客户端协调、IOR/mdtest 等适配、资源观测 | 验证同步窗口、聚合与资源隔离，区分客户端和服务端瓶颈 |
+| M4：分析增强 | Agent 分析 skill、报告、后续实验建议 | 结论能引用原始证据，建议可转为受约束的下一轮计划 |
 
-首版完成边界为 M0–M2。M3/M4 不阻塞首版交付。初期不建设通用工作流平台、自动部署文件系统或多租户服务。
+首版完成边界为 M0–M2。Agent 操作契约、CLI 与 Kubernetes 单 Pod 路径进入首版范围；高级诊断和多客户端扩展逐步推进。
 
-## 使用入口草案
-
-**以下命令尚未实现，用于明确预期交互，不是当前可执行的安装或使用教程。**
-
-```sh
-malta run --spec benchmarks/seq-read.yaml --target /mnt/fs/malta-test --output ./results
-malta import ./results/<run-id> --data-dir ./malta-data
-malta serve --data-dir ./malta-data --listen 127.0.0.1:8080
-```
-
-`run` 产生独立结果包，`import` 将其加入服务的数据目录，`serve` 提供 API 和 UI。已有 fio 结果需要补充负载与环境 manifest 后才能参与可靠比较。构建、安装和部署教程将在实现对应功能后补齐。
+具体编码顺序、目录职责、逐阶段验收和发布标准见 [v0.1 代码实现路线图](docs/roadmap-v0.1.md)。
 
 ## 设计文档
 
+- [v0.1 代码实现路线图](docs/roadmap-v0.1.md)
 - [架构与语言选型](docs/architecture.md)
 - [Benchmark 方法与比较规则](docs/benchmark-methodology.md)
+- [Agent skills 规划](skills/README.md)
+- [Kubernetes 部署与运行规划](deploy/kubernetes/README.md)
+- [容器镜像规划](build/docker/README.md)
 
-开发依赖版本将在首次代码实现时通过 `go.mod` 与前端 lockfile 固定。项目许可证尚未选定。
+依赖版本、安装教程、可执行示例、支持的 Kubernetes/CSI 组合将在实现与验证后补齐。许可证尚未选定。
