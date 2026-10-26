@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Activity, BarChart3, Database, X } from "lucide-react";
+import { ScenarioView } from "./ScenarioView";
 import { Chart } from "./LazyChart";
 import { format, metricLabel, statusLabel, summarize, type Run } from "./model";
 export function Badge({ status }: { status: string }) {
@@ -168,6 +169,7 @@ export function RunMetrics({ run }: { run: Run }) {
   }, [run]);
   return (
     <>
+      <ScenarioView run={run} />
       <div className="metric-heading">
         <BarChart3 size={17} />
         <h3>重复实验摘要</h3>
@@ -190,7 +192,7 @@ export function RunMetrics({ run }: { run: Run }) {
               {summaries.map((s) => (
                 <tr key={s.key}>
                   <td>
-                    {s.operation} · {metricLabel[s.metric]}
+                    {s.stage_id && <small>{s.stage_id} / {s.workload_id}<br /></small>}{s.operation} · {metricLabel[s.metric]}
                   </td>
                   <td>
                     {s.numjobs} × {s.iodepth}
@@ -214,7 +216,7 @@ export function RunMetrics({ run }: { run: Run }) {
           text="准备阶段、失败与未完成试验不会被当作性能零值。"
         />
       )}
-      {throughput.length > 0 && (
+      {!run.plan.spec.scenario && throughput.length > 0 && (
         <>
           <h3 className="chart-title">已测并发曲线</h3>
           <Chart option={option} label="吞吐随 jobs 和队列深度变化的实测曲线" />

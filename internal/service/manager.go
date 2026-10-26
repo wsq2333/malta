@@ -80,7 +80,7 @@ func (m *Manager) validate(p domain.Plan, executor string) error {
 	if e := p.Validate(); e != nil {
 		return e
 	}
-	if p.Spec.Kind != "data" || p.Spec.Workload.CacheState == "cold-verified" {
+	if (p.Spec.Kind != "data" && p.Spec.Kind != "scenario") || p.Spec.Workload.CacheState == "cold-verified" {
 		return domain.E("unsupported", "local runner supports data plans without cold-verified claims")
 	}
 	if executor == "kubernetes" {
@@ -106,14 +106,11 @@ func (m *Manager) validate(p domain.Plan, executor string) error {
 			return domain.E("invalid", "target is outside configured allowed roots")
 		}
 	}
-	var bytes int64
-	for _, pnt := range p.Trials {
-		bytes += p.Spec.Workload.FileSizeBytes * int64(p.Spec.Workload.FilesPerJob) * int64(pnt.NumJobs)
-		if bytes < 0 || bytes > m.Config.MaxBytes {
-			return domain.E("invalid", "plan exceeds server data budget")
-		}
+	bytes, seconds := p.Budget()
+	if bytes < 0 || bytes > m.Config.MaxBytes {
+		return domain.E("invalid", "plan exceeds server data budget")
 	}
-	seconds := int64(len(p.Trials)) * int64(p.Spec.Workload.RuntimeSeconds+p.Spec.Workload.WarmupSeconds)
+
 	if time.Duration(seconds)*time.Second >= m.Config.Timeout {
 		return domain.E("invalid", "measurement duration leaves no preparation time within server deadline")
 	}
@@ -179,7 +176,7 @@ func (m *Manager) Cancel(id string) (domain.Run, error) {
 		return r, e
 	}
 	if r.Status == "cancelled" {
-		e = m.Store.Finish(artifact.Bundle{SchemaVersion: domain.Schema, Run: r, Files: []artifact.File{}})
+		e = m.Store.Finish(artifact.Bundle{SchemaVersion: r.SchemaVersion, Run: r, Files: []artifact.File{}})
 	}
 	return r, e
 }
@@ -269,7 +266,7 @@ func (m *Manager) loop() {
 		}
 		b, collectErr := artifact.Collect(out, final)
 		if errors.Is(collectErr, os.ErrNotExist) {
-			b = artifact.Bundle{SchemaVersion: domain.Schema, Run: final, Files: []artifact.File{}}
+			b = artifact.Bundle{SchemaVersion: final.SchemaVersion, Run: final, Files: []artifact.File{}}
 			collectErr = nil
 		}
 		if collectErr == nil {

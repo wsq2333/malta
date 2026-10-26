@@ -34,3 +34,7 @@ test("missing values remain missing, while measured zero stays zero", () => {
   assert.equal(format(1048576, "bytes/s"), "1 MiB/s");
   assert.equal(format(1000, "ns"), "1 μs");
 });
+test("scenario workloads with identical concurrency stay separate",()=>{
+ const trials=["reader-a","reader-b"].flatMap((id,i)=>[1,2].map(repeat=>({point:{id:`${id}-${repeat}`,stage_id:"mix",workload_id:id,numjobs:1,iodepth:1,repeat},status:"succeeded",metrics:[{operation:"read",name:"throughput",unit:"bytes/s",value:10+i*90}]})));
+ const summary=summarize({trials});assert.equal(summary.length,2);assert.deepEqual(summary.map(s=>s.count),[2,2]);assert.deepEqual(summary.map(s=>s.median),[10,100]);assert.equal(summary[0].stage_id,"mix");
+});

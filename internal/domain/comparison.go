@@ -17,16 +17,18 @@ type Baseline struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 type Summary struct {
-	Key       string  `json:"key"`
-	NumJobs   int     `json:"numjobs"`
-	IODepth   int     `json:"iodepth"`
-	Operation string  `json:"operation"`
-	Metric    string  `json:"metric"`
-	Unit      string  `json:"unit"`
-	Count     int     `json:"count"`
-	Median    float64 `json:"median"`
-	Min       float64 `json:"min"`
-	Max       float64 `json:"max"`
+	StageID    string  `json:"stage_id,omitempty"`
+	WorkloadID string  `json:"workload_id,omitempty"`
+	Key        string  `json:"key"`
+	NumJobs    int     `json:"numjobs"`
+	IODepth    int     `json:"iodepth"`
+	Operation  string  `json:"operation"`
+	Metric     string  `json:"metric"`
+	Unit       string  `json:"unit"`
+	Count      int     `json:"count"`
+	Median     float64 `json:"median"`
+	Min        float64 `json:"min"`
+	Max        float64 `json:"max"`
 }
 type Difference struct {
 	Field  string `json:"field"`
@@ -56,8 +58,11 @@ func Summarize(r Run) []Summary {
 		}
 		for _, m := range t.Metrics {
 			k := fmt.Sprintf("n%d-d%d/%s/%s", t.Point.NumJobs, t.Point.IODepth, m.Operation, m.Name)
+			if t.Point.StageID != "" {
+				k = t.Point.StageID + "/" + t.Point.WorkloadID + "/" + k
+			}
 			groups[k] = append(groups[k], m.Value)
-			info[k] = Summary{Key: k, NumJobs: t.Point.NumJobs, IODepth: t.Point.IODepth, Operation: m.Operation, Metric: m.Name, Unit: m.Unit}
+			info[k] = Summary{StageID: t.Point.StageID, WorkloadID: t.Point.WorkloadID, Key: k, NumJobs: t.Point.NumJobs, IODepth: t.Point.IODepth, Operation: m.Operation, Metric: m.Name, Unit: m.Unit}
 		}
 	}
 	out := []Summary{}
@@ -86,9 +91,19 @@ func Compare(a, b Run) Comparison {
 		diff("status", "both runs must succeed")
 	}
 	if a.Plan.Spec.Kind != b.Plan.Spec.Kind {
-		diff("kind", "data and metadata cannot be compared")
+		diff("kind", "different workload kinds cannot be compared")
 	}
 	sa, sb := a.Plan.Spec, b.Plan.Spec
+	if sa.Scenario != nil {
+		aCopy := *sa.Scenario
+		aCopy.Name = ""
+		sa.Scenario = &aCopy
+	}
+	if sb.Scenario != nil {
+		bCopy := *sb.Scenario
+		bCopy.Name = ""
+		sb.Scenario = &bCopy
+	}
 	sa.Name = ""
 	sb.Name = ""
 	if Hash(sa) != Hash(sb) {

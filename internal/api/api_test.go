@@ -251,3 +251,88 @@ func TestCancelAndRestart(t *testing.T) {
 		t.Fatal("policy change broke idempotent retrieval", e)
 	}
 }
+
+func TestRealManagedScenario(t *testing.T) {
+	bin := os.Getenv("MALTA_TEST_FIO")
+	if bin == "" {
+		t.Skip("requires real fio 3.33")
+	}
+	target := t.TempDir()
+	old := testPlan(t, target)
+	var sc domain.ScenarioSpec
+	if e := domain.Read("../../benchmarks/scenarios/mixed-data.yaml", &sc); e != nil {
+		t.Fatal(e)
+	}
+	sc.Repeats = 1
+	sc.Stages[0].RuntimeSeconds = 2
+	sc.Stages[0].WarmupSeconds = 0
+	// Identical concurrency must still retain distinct workload identity.
+	sc.Stages[0].Workloads[0].NumJobs = 1
+	p, e := domain.NewScenarioPlan(sc, old.Environment, old.Version, target, "scene")
+	if e != nil {
+		t.Fatal(e)
+	}
+	s, e := store.Open(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	m, e := service.New(s, service.Config{AllowedRoots: []string{target}, Fio: bin, MaxBytes: 1 << 30, Timeout: 30 * time.Second})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer m.Close()
+	server := httptest.NewServer(Handler(m, "test-token", nil))
+	defer server.Close()
+	q := service.StartRequest{Plan: p, RequestID: "scenario-e2e", Source: "agent", Executor: "local"}
+	status, data := call(t, server.URL, "POST", "/api/v1/runs", "test-token", q)
+	if status != 202 {
+		t.Fatal(status, string(data))
+	}
+	var r domain.Run
+	json.Unmarshal(data, &r)
+	_, data = call(t, server.URL, "POST", "/api/v1/runs", "test-token", q)
+	var same domain.Run
+	json.Unmarshal(data, &same)
+	if same.ID != r.ID {
+		t.Fatal("duplicate run")
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		r, e = s.Run(r.ID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if domain.Terminal(r.Status) && r.Attempt.ResultState != "collecting" {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if r.Status != "succeeded" || r.Attempt.ResultState != "complete" {
+		t.Fatal(r.Status, r.Error)
+	}
+	b, e := s.Bundle(r.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	other, e := store.Open(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer other.Close()
+	if e = other.Import(b); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = other.SetBaseline("mixed", r.ID); e != nil {
+		t.Fatal(e)
+	}
+	comparison, e := other.Compare(r.ID, r.ID)
+	if e != nil || !comparison.Comparable || len(comparison.Metrics) != 6 {
+		t.Fatal(comparison, e)
+	}
+	for _, d := range comparison.Metrics {
+		if d.Baseline.StageID == "" || d.Baseline.Count != 1 {
+			t.Fatal("workloads merged", d)
+		}
+	}
+}
