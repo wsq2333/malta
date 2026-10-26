@@ -18,4 +18,10 @@ Implemented SQLite persistence, immutable snapshots, idempotent imports with raw
 
 Validation: local tests and vet plus Linux test binaries passed SQLite roundtrip/conflict, baseline, changed hardware/workload, failed run, zero baseline and genuine metadata fixture cases. Performance dates for imported metadata are import dates, with original timestamps retained in raw evidence.
 
-S3–S4 are in progress. Kubernetes Job execution remains S5.
+## S3 — managed API and Agent CLI
+
+Implemented single-manager SQLite queue, one conservative local worker, server-side target/budget validation, idempotent request IDs, cancellation, restart interruption, authenticated API, bounded log snapshots, wait semantics and local Agent skill. Restart never automatically replays an unfinished write experiment. OpenAPI now links concrete response schemas.
+
+Validation: local API and storage race checks, structured CLI error tests, skill validator; Linux API tests with real fio passed. The Linux end-to-end CLI script verifies identical retries, wait timeout without cancellation, three actual repeats, baseline comparison, evidence export and cancellation. All benchmark data is isolated beneath the designated temporary test workspace.
+
+S4 is in progress. Kubernetes Job execution remains S5.

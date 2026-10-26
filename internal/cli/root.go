@@ -65,7 +65,27 @@ func NewRoot(out, errOut io.Writer) *cobra.Command {
 	}})
 	executionCommands(r, o)
 	dataCommands(r, o)
+	serverCommands(r, o)
+	wrapExecutionErrors(r)
 	return r
+}
+func wrapExecutionErrors(c *cobra.Command) {
+	if run := c.RunE; run != nil {
+		c.RunE = func(cmd *cobra.Command, args []string) error {
+			e := run(cmd, args)
+			if e == nil {
+				return nil
+			}
+			var d *domain.Error
+			if errors.As(e, &d) {
+				return e
+			}
+			return domain.E("execution", e.Error())
+		}
+	}
+	for _, child := range c.Commands() {
+		wrapExecutionErrors(child)
+	}
 }
 func Execute(args []string, out, errOut io.Writer) int {
 	r := NewRoot(out, errOut)

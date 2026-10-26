@@ -2,55 +2,203 @@ openapi: 3.1.0
 info:
   title: Malta API
   version: 0.1.0
-  description: Single-instance run management and evidence-based benchmark comparison. Kubernetes execution is reserved for S5.
+  description: Single-instance run management and evidence-based benchmark comparison.
+    Kubernetes execution is reserved for S5. Bearer authentication is required when
+    a server token is configured. One local worker runs serially; logs are bounded
+    snapshots.
 servers:
-  - url: /api/v1
+- url: /api/v1
 security:
-  - bearerAuth: []
+- bearerAuth: []
 paths:
   /health:
     get:
       security: []
       responses:
-        '200': {description: Server version and available executors}
+        '200':
+          description: Server version and available executors
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /environments:
     get:
       responses:
-        '200': {description: Environment snapshots}
+        '200':
+          description: Environment snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/environment.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '../schemas/environment.json'}
+            schema:
+              $ref: ../schemas/environment.json
       responses:
-        '201': {description: Registered immutable snapshot}
-        '409': {description: Identifier already has different content}
+        '201':
+          description: Registered immutable snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/environment.json
+        '409':
+          description: Identifier already has different content
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /versions:
     get:
       responses:
-        '200': {description: Registered filesystem versions}
+        '200':
+          description: Registered filesystem versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/version.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '../schemas/version.json'}
+            schema:
+              $ref: ../schemas/version.json
       responses:
-        '201': {description: Registered version}
+        '201':
+          description: Registered version
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/version.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /runs:
     get:
       parameters:
-        - {name: environment, in: query, schema: {type: string}}
-        - {name: version, in: query, schema: {type: string}}
-        - {name: kind, in: query, schema: {type: string, enum: [data, metadata]}}
-        - {name: status, in: query, schema: {type: string}}
-        - {name: from, in: query, schema: {type: string, format: date-time}}
-        - {name: to, in: query, schema: {type: string, format: date-time}}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
-        - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
+      - name: environment
+        in: query
+        schema:
+          type: string
+      - name: version
+        in: query
+        schema:
+          type: string
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum:
+          - data
+          - metadata
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
       responses:
-        '200': {description: Runs ordered by creation time descending}
+        '200':
+          description: Runs ordered by creation time descending
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/run.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       requestBody:
         required: true
@@ -59,18 +207,52 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [plan, request_id, source, executor]
+              required:
+              - plan
+              - request_id
+              - source
+              - executor
               properties:
-                plan: {$ref: '../schemas/plan.json'}
-                request_id: {type: string}
-                source: {type: string, enum: [human, agent, ci]}
-                executor: {type: string, enum: [local]}
+                plan:
+                  $ref: ../schemas/plan.json
+                request_id:
+                  type: string
+                source:
+                  type: string
+                  enum:
+                  - human
+                  - agent
+                  - ci
+                executor:
+                  type: string
+                  enum:
+                  - local
       responses:
-        '202': {description: Submitted or existing logical Run}
-        '409': {description: Request identifier conflict}
+        '202':
+          description: Submitted or existing logical Run
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        '409':
+          description: Request identifier conflict
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /runs/{id}:
     parameters:
-      - {$ref: '#/components/parameters/RunID'}
+    - $ref: '#/components/parameters/RunID'
     get:
       responses:
         '200':
@@ -79,45 +261,161 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [schema_version, data]
+                required:
+                - schema_version
+                - data
                 properties:
-                  schema_version: {const: '1.0'}
-                  data: {$ref: '../schemas/run.json'}
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /runs/{id}/cancel:
     parameters:
-      - {$ref: '#/components/parameters/RunID'}
+    - $ref: '#/components/parameters/RunID'
     post:
       responses:
-        '200': {description: Current state after cancellation request; poll for terminal state}
+        '200':
+          description: Current state after cancellation request; poll for terminal
+            state
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /runs/{id}/logs:
     parameters:
-      - {$ref: '#/components/parameters/RunID'}
+    - $ref: '#/components/parameters/RunID'
     get:
       responses:
-        '200': {description: Bounded log snapshot with truncation indicator}
+        '200':
+          description: Bounded log snapshot with truncation indicator
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /runs/{id}/bundle:
     parameters:
-      - {$ref: '#/components/parameters/RunID'}
+    - $ref: '#/components/parameters/RunID'
     get:
       responses:
-        '200': {description: Portable bundle with base64 files and SHA-256 hashes}
+        '200':
+          description: Portable bundle with base64 files and SHA-256 hashes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/bundle.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /runs/{id}/artifacts/{path}:
     parameters:
-      - {$ref: '#/components/parameters/RunID'}
-      - {name: path, in: path, required: true, schema: {type: string}, description: Registered relative artifact path}
+    - $ref: '#/components/parameters/RunID'
+    - name: path
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Registered relative artifact path
     get:
       responses:
-        '200': {description: Verified original artifact bytes}
+        '200':
+          description: Verified original artifact bytes
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /imports:
     post:
-      description: Import a validated portable result bundle, capped at 32 MiB.
+      description: Import a verified portable bundle, at most 32 MiB decoded artifacts
+        and 64 MiB HTTP body.
       responses:
-        '201': {description: Imported or identical existing run}
-        '409': {description: Run identifier has different content}
+        '201':
+          description: Imported or identical existing run
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        '409':
+          description: Run identifier has different content
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/bundle.json
   /baselines:
     get:
       responses:
-        '200': {description: Immutable baseline versions}
+        '200':
+          description: Immutable baseline versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/baseline.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       requestBody:
         required: true
@@ -126,12 +424,35 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [name, run_id]
+              required:
+              - name
+              - run_id
               properties:
-                name: {type: string}
-                run_id: {type: string}
+                name:
+                  type: string
+                run_id:
+                  type: string
       responses:
-        '201': {description: New baseline version referencing a complete run}
+        '201':
+          description: New baseline version referencing a complete run
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/baseline.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /comparisons:
     post:
       requestBody:
@@ -141,32 +462,145 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [baseline, candidate]
+              required:
+              - baseline
+              - candidate
               properties:
-                baseline: {type: string, description: Baseline identifier or run identifier}
-                candidate: {type: string, description: Candidate run identifier}
+                baseline:
+                  type: string
+                  description: Baseline run identifier
+                candidate:
+                  type: string
+                  description: Candidate run identifier
       responses:
-        '200': {description: Comparability reasons and per-point median/min/max differences; null percentage when baseline is zero}
+        '200':
+          description: Comparability reasons and per-point median/min/max differences;
+            null percentage when baseline is zero
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/comparison.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /trends:
     get:
       parameters:
-        - {name: run_id, in: query, required: true, schema: {type: string}, description: Anchor run defining environment and workload}
+      - name: run_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: Anchor run defining environment and workload
       responses:
-        '200': {description: Same-environment, same-workload, same-tool successful history}
+        '200':
+          description: Same-environment
+          same-workload: null
+          same-tool successful history: null
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /environments/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Immutable registered identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/environment.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /versions/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Immutable registered identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/version.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   securitySchemes:
-    bearerAuth: {type: http, scheme: bearer}
+    bearerAuth:
+      type: http
+      scheme: bearer
   parameters:
-    RunID: {name: id, in: path, required: true, schema: {type: string}}
+    RunID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     ErrorEnvelope:
       type: object
-      required: [schema_version, error]
+      required:
+      - schema_version
+      - error
       properties:
-        schema_version: {const: '1.0'}
+        schema_version:
+          const: '1.0'
         error:
           type: object
-          required: [code, message]
+          required:
+          - code
+          - message
           properties:
-            code: {type: string, enum: [invalid, unsupported, conflict, not_found, unauthorized, timeout, cancelled, internal]}
-            message: {type: string}
+            code:
+              type: string
+              enum:
+              - invalid
+              - unsupported
+              - conflict
+              - not_found
+              - unauthorized
+              - timeout
+              - cancelled
+              - internal
+            message:
+              type: string

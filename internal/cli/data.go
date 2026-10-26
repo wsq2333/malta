@@ -22,9 +22,6 @@ func access(o *Options, method, path string, body any, local func(*store.Store) 
 	defer s.Close()
 	return local(s)
 }
-func remote(o *Options, method, path string, body any) (any, error) {
-	return nil, domain.E("unsupported", "HTTP support arrives in S3")
-}
 func dataCommands(root *cobra.Command, o *Options) {
 	for _, kind := range []string{"environment", "version"} {
 		kind := kind
