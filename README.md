@@ -116,6 +116,7 @@ MALTA_BIN="$PWD/bin/malta" MALTA_TEST_FIO=/path/to/fio \
 - [CLI 与运行说明](docs/cli.md)
 - [架构与语言选型](docs/architecture.md)
 - [测试方法与可比性](docs/benchmark-methodology.md)
+- [多负载场景定义草案](docs/mixed-workloads.md)（顺序、并行、权重与流水线，尚未实现）
 - [S0–S7 路线图](docs/roadmap-v0.1.md)
 - [实现与验证记录](docs/implementation.md)
 - [Agent 测试 skill](skills/malta-benchmark/SKILL.md)
