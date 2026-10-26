@@ -4,7 +4,7 @@ export function ScenarioView({run}:{run:Run}) {
  const scenario=run.plan.spec.scenario;if(!scenario)return null;
  return <section className="scenario-view"><h3>混合负载场景</h3><p className="muted">{scenario.repeats} 次完整场景重复 · 独立数据集 · 任一子负载失败即停止整组</p>
  {scenario.stages.map(stage=><article key={stage.id} className="scenario-stage"><header><strong>{stage.id}</strong><span className="pill">{stage.mode}</span><span className="muted">预热 {stage.warmup_seconds}s / 测量 {stage.runtime_seconds}s</span></header>
- <div className="scenario-workloads">{stage.workloads.map(w=><div key={w.id}><b>{w.id}</b><span>{w.workload.operation} · 文件 {size(w.workload.file_size_bytes)} / 块 {size(w.workload.block_size_bytes)}</span><small>{w.numjobs} workers × depth {w.iodepth}</small></div>)}</div>
+ <div className="scenario-workloads">{stage.workloads.map(w=><div key={w.id}><b>{w.id}</b><span>{w.workload.operation} · 文件 {size(w.workload.file_size_bytes)} / 块 {size(w.workload.block_size_bytes)}</span><small>{w.steps?.join(" → ")}</small><small>{w.numjobs} workers × depth {w.iodepth}</small></div>)}</div>
  {Array.from({length:scenario.repeats},(_,i)=>i+1).map(repeat=>{
  const trials=run.trials.filter(t=>t.point.stage_id===stage.id&&t.point.repeat===repeat);
  const valid=trials.filter(t=>t.status==="succeeded"&&Date.parse(t.finished_at||"")>Date.parse(t.started_at||""));

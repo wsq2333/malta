@@ -98,7 +98,7 @@ func VerifyEvidence(b artifact.Bundle) error {
 	if b.Run.Status == "succeeded" && b.Run.Plan.Spec.Scenario != nil {
 		for repeat := 1; repeat <= b.Run.Plan.Spec.Repeats; repeat++ {
 			for _, stage := range b.Run.Plan.Spec.Scenario.Stages {
-				if stage.Mode != "parallel" && stage.Mode != "weighted" {
+				if stage.Mode != "parallel" && stage.Mode != "weighted" && stage.Mode != "pipeline" {
 					continue
 				}
 				trials := []domain.Trial{}

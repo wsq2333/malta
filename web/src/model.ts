@@ -40,7 +40,7 @@ export interface Workload {
   warmup_seconds: number;
   seed: number;
 }
-export interface ScenarioWorkload { id: string; kind: string; numjobs: number; iodepth: number; workload: Workload; }
+export interface ScenarioWorkload { steps?: string[]; id: string; kind: string; numjobs: number; iodepth: number; workload: Workload; }
 export interface ScenarioStage { mix?: {basis: string; weights: Record<string,number>; seed: number}; id: string; mode: string; warmup_seconds: number; runtime_seconds: number; workloads: ScenarioWorkload[]; }
 export interface Scenario { name: string; stages: ScenarioStage[]; repeats: number; }
 export interface Spec {
@@ -158,6 +158,7 @@ export const operationLabel: Record<string, string> = {
 export const metricLabel: Record<string, string> = {
   throughput: "吞吐",
   iops: "IOPS",
+  operation_rate: "操作速率",
   latency_p99_upper: "原生操作 P99 上界",
   clat_p99: "每次测试 P99",
   metadata_rate: "操作速率",

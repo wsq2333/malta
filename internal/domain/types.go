@@ -284,7 +284,7 @@ type Metric struct {
 }
 
 func (m Metric) Validate() error {
-	units := map[string]string{"throughput": "bytes/s", "iops": "ops/s", "clat_p99": "ns", "metadata_rate": "ops/s", "latency_p99_upper": "ns"}
+	units := map[string]string{"throughput": "bytes/s", "iops": "ops/s", "clat_p99": "ns", "metadata_rate": "ops/s", "latency_p99_upper": "ns", "operation_rate": "ops/s"}
 	unit, known := units[m.Name]
 	if !known || unit != m.Unit || m.Operation == "" || math.IsNaN(m.Value) || math.IsInf(m.Value, 0) || m.Value < 0 {
 		return E("invalid", "invalid metric name/unit/value")

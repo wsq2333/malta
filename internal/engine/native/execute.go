@@ -20,16 +20,22 @@ type Request struct {
 	OutDir  string      `json:"out_dir"`
 }
 type fileset struct {
-	files  []*os.File
-	buffer []byte
-	random *rand.Rand
-	offset int64
-	cursor int
+	path       string
+	activeFile *os.File
+	files      []*os.File
+	buffer     []byte
+	random     *rand.Rand
+	offset     int64
+	cursor     int
 }
 
 func prepare(ctx context.Context, w domain.ScenarioWorkload, worker int, dir string) (*fileset, error) {
 	f := &fileset{buffer: make([]byte, w.Workload.BlockSizeBytes), random: rand.New(rand.NewSource(int64(w.Workload.Seed) + int64(worker)))}
 	f.random.Read(f.buffer)
+	if w.Kind == "pipeline" {
+		f.path = filepath.Join(dir, fmt.Sprintf("worker-%d-cycle", worker))
+		return f, nil
+	}
 	for i := 0; i < w.Workload.FilesPerJob; i++ {
 		file, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("worker-%d-file-%d", worker, i)), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
 		if err != nil {
@@ -55,11 +61,58 @@ func prepare(ctx context.Context, w domain.ScenarioWorkload, worker int, dir str
 	return f, nil
 }
 func (f *fileset) close() {
+	if f.activeFile != nil {
+		f.activeFile.Close()
+	}
 	for _, file := range f.files {
 		file.Close()
 	}
 }
-func (f *fileset) operation(w domain.ScenarioWorkload) (string, int, error) {
+
+type observer func(string, int, error, time.Time, time.Time)
+
+func (f *fileset) perform(w domain.ScenarioWorkload, record observer) error {
+	if w.Kind == "pipeline" {
+		for _, op := range w.Steps {
+			var n int
+			var err error
+			began := time.Now().UTC()
+			switch op {
+			case "create":
+				f.activeFile, err = os.OpenFile(f.path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+			case "write":
+				n, err = f.activeFile.WriteAt(f.buffer, 0)
+			case "fsync":
+				err = f.activeFile.Sync()
+			case "stat":
+				_, err = os.Stat(f.path)
+			case "read":
+				n, err = f.activeFile.ReadAt(f.buffer, 0)
+			case "unlink":
+				err = os.Remove(f.path)
+			}
+			finished := time.Now().UTC()
+			record(op, n, err, began, finished)
+			if err != nil {
+				return err
+			}
+			if op == "unlink" {
+				if err = f.activeFile.Close(); err != nil {
+					return err
+				}
+				f.activeFile = nil
+			}
+		}
+		return nil
+	}
+	file := f.files[f.cursor%len(f.files)]
+	f.cursor++
+	if w.Kind == "metadata" {
+		began := time.Now().UTC()
+		_, err := os.Stat(file.Name())
+		record("stat", 0, err, began, time.Now().UTC())
+		return err
+	}
 	op := w.Workload.Operation
 	random := op == "randread" || op == "randwrite" || op == "randrw"
 	if op == "randrw" {
@@ -79,14 +132,16 @@ func (f *fileset) operation(w domain.ScenarioWorkload) (string, int, error) {
 		offset = f.random.Int63n(blocks)
 	}
 	f.offset++
-	file := f.files[f.cursor%len(f.files)]
-	f.cursor++
+	began := time.Now().UTC()
+	var n int
+	var err error
 	if op == "read" {
-		n, err := file.ReadAt(f.buffer, offset*int64(len(f.buffer)))
-		return op, n, err
+		n, err = file.ReadAt(f.buffer, offset*int64(len(f.buffer)))
+	} else {
+		n, err = file.WriteAt(f.buffer, offset*int64(len(f.buffer)))
 	}
-	n, err := file.WriteAt(f.buffer, offset*int64(len(f.buffer)))
-	return op, n, err
+	record(op, n, err, began, time.Now().UTC())
+	return err
 }
 
 // Smooth weighted round-robin determines submission order; waiting for a free worker
@@ -182,19 +237,24 @@ func Execute(ctx context.Context, q Request) error {
 			go func(i int, w domain.ScenarioWorkload, f *fileset) {
 				defer wg.Done()
 				for {
-					select {
-					case <-active.Done():
+					if stage.Mode == "weighted" {
+						select {
+						case <-active.Done():
+							return
+						case <-queues[i]:
+						}
+					} else if active.Err() != nil {
 						return
-					case <-queues[i]:
 					}
-					began := time.Now().UTC()
-					if !began.Before(end) {
+					if !time.Now().Before(end) {
 						return
 					}
-					op, n, err := f.operation(w)
-					finished := time.Now().UTC()
-					if !began.Before(start) {
+					err := f.perform(w, func(op string, n int, err error, began, finished time.Time) {
+						if began.Before(start) || !began.Before(end) {
+							return
+						}
 						locks[i].Lock()
+						defer locks[i].Unlock()
 						for j := range ev[i].Counters {
 							c := &ev[i].Counters[j]
 							if c.Operation != op {
@@ -220,8 +280,7 @@ func Execute(ctx context.Context, q Request) error {
 							}
 							break
 						}
-						locks[i].Unlock()
-					}
+					})
 					if err != nil {
 						select {
 						case failures <- err:
@@ -234,20 +293,25 @@ func Execute(ctx context.Context, q Request) error {
 			}(i, w, f)
 		}
 	}
-	weights := make([]int, count)
-	for i, w := range stage.Workloads {
-		weights[i] = stage.Mix.Weights[w.ID]
-	}
-	sched := NewScheduler(weights, stage.Mix.Seed)
-dispatch:
-	for {
-		next := sched.Next()
-		select {
-		case <-active.Done():
-			break dispatch
-		case queues[next] <- struct{}{}:
+	if stage.Mode == "weighted" {
+		weights := make([]int, count)
+		for i, w := range stage.Workloads {
+			weights[i] = stage.Mix.Weights[w.ID]
 		}
+		sched := NewScheduler(weights, stage.Mix.Seed)
+	dispatch:
+		for {
+			next := sched.Next()
+			select {
+			case <-active.Done():
+				break dispatch
+			case queues[next] <- struct{}{}:
+			}
+		}
+	} else {
+		<-active.Done()
 	}
+
 	cancel()
 	wg.Wait()
 	for i := range ev {

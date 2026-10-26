@@ -250,6 +250,12 @@
     },
     "ScenarioWorkload": {
       "properties": {
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "engine": {
           "type": "string"
         },

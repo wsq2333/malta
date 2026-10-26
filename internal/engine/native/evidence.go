@@ -55,21 +55,36 @@ func Parse(e Evidence, stage domain.Stage, p domain.Point) (domain.Trial, error)
 		if samples != measured {
 			return t, domain.E("invalid", "native histogram sample count mismatch")
 		}
-		if c.Bytes != measured*uint64(w.Workload.BlockSizeBytes) {
+		expectedBytes := uint64(0)
+		if c.Operation == "read" || c.Operation == "write" {
+			expectedBytes = measured * uint64(w.Workload.BlockSizeBytes)
+		}
+		if c.Bytes != expectedBytes {
 			return t, domain.E("invalid", "native byte counter mismatch")
 		}
 		t.Activity.Submitted += c.Submitted
 		t.Activity.Succeeded += c.Succeeded
 		t.Activity.Errors += c.Errors
 		t.Activity.Late += c.Late
+		if measured == 0 && w.Kind == "pipeline" {
+			return t, domain.E("invalid", "pipeline has an unmeasured step")
+		}
 		if measured == 0 {
 			continue
 		}
 		add := func(name, unit string, value float64) {
 			t.Metrics = append(t.Metrics, domain.Metric{Operation: c.Operation, Name: name, Unit: unit, Value: value, Source: Version})
 		}
-		add("throughput", "bytes/s", float64(c.Bytes)/secs)
-		add("iops", "ops/s", float64(measured)/secs)
+		if c.Operation == "read" || c.Operation == "write" {
+			add("throughput", "bytes/s", float64(c.Bytes)/secs)
+			add("iops", "ops/s", float64(measured)/secs)
+		} else {
+			metric := "metadata_rate"
+			if c.Operation == "fsync" {
+				metric = "operation_rate"
+			}
+			add(metric, "ops/s", float64(measured)/secs)
+		}
 		threshold := (measured*99 + 99) / 100
 		var count uint64
 		for bucket, n := range c.Histogram {
@@ -79,6 +94,9 @@ func Parse(e Evidence, stage domain.Stage, p domain.Point) (domain.Trial, error)
 				break
 			}
 		}
+	}
+	if len(seen) != len(allowed) {
+		return t, domain.E("invalid", "native operation counters missing")
 	}
 	if len(t.Metrics) == 0 {
 		return t, domain.E("execution", fmt.Sprintf("no completed measurement operations for %s", p.WorkloadID))

@@ -66,7 +66,11 @@ func executeScenario(ctx context.Context, result *domain.Run, out, data string, 
 				stdout.Close()
 				stderr.Close()
 				if err != nil {
-					return fmt.Errorf("native stage %s: %w", stage.ID, err)
+					detail, _ := os.ReadFile(input + ".stdout")
+					if len(detail) > 2048 {
+						detail = detail[:2048]
+					}
+					return fmt.Errorf("native stage %s: %w: %s", stage.ID, err, detail)
 				}
 				measured := []domain.Trial{}
 				for _, p := range result.Plan.Trials {

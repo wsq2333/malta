@@ -35,6 +35,7 @@ type Stage struct {
 	Workloads      []ScenarioWorkload `json:"workloads"`
 }
 type ScenarioWorkload struct {
+	Steps    []string `json:"steps,omitempty"`
 	Engine   string   `json:"engine,omitempty"`
 	ID       string   `json:"id"`
 	Kind     string   `json:"kind"`
@@ -54,7 +55,7 @@ func (s ScenarioSpec) Validate() error {
 			return E("invalid", "stage IDs must be unique lowercase identifiers (max 32 characters)")
 		}
 		seen[stage.ID] = true
-		if stage.Mode != "sequential" && stage.Mode != "parallel" && stage.Mode != "weighted" {
+		if stage.Mode != "sequential" && stage.Mode != "parallel" && stage.Mode != "weighted" && stage.Mode != "pipeline" {
 			return E("unsupported", "scenario mode is not supported")
 		}
 		if stage.DatasetPolicy != "isolated_per_workload" || len(stage.Workloads) == 0 || len(stage.Workloads) > 16 {
@@ -74,8 +75,24 @@ func (s ScenarioSpec) Validate() error {
 				return E("invalid", "workload IDs must be unique lowercase identifiers within a stage")
 			}
 			children[w.ID] = true
-			if w.Kind != "data" {
-				return E("unsupported", "scenario currently supports data workloads")
+			if !slices.Contains([]string{"data", "metadata", "pipeline"}, w.Kind) {
+				return E("unsupported", "unknown scenario workload kind")
+			}
+			if w.Kind != "data" && w.Engine != "native" {
+				return E("unsupported", "metadata and pipeline execution require native engine")
+			}
+			if (stage.Mode == "pipeline") != (w.Kind == "pipeline") {
+				return E("invalid", "pipeline workloads require pipeline stage")
+			}
+			if w.Kind == "pipeline" {
+				if err := validatePipeline(w); err != nil {
+					return err
+				}
+			} else if len(w.Steps) > 0 {
+				return E("invalid", "steps are only valid for pipelines")
+			}
+			if w.Kind == "metadata" && w.Workload.Operation != "stat" {
+				return E("unsupported", "standalone native metadata supports stat; create/unlink use pipeline")
 			}
 			if w.Workload.RuntimeSeconds != 0 || w.Workload.WarmupSeconds != 0 {
 				return E("invalid", "duration belongs to the stage, not the workload")
@@ -84,8 +101,14 @@ func (s ScenarioSpec) Validate() error {
 				if w.Engine != "native" || stage.Mix.Weights[w.ID] < 1 || stage.Mix.Weights[w.ID] > 10000 {
 					return E("invalid", "weighted workloads require native engine and weights 1..10000")
 				}
-			} else if w.Engine != "" && w.Engine != "fio" {
-				return E("unsupported", "this mode requires fio engine")
+			} else if w.Engine != "" && w.Engine != "fio" && w.Engine != "native" {
+				return E("unsupported", "unknown engine")
+			}
+			if stage.Native() != (w.Engine == "native") {
+				return E("unsupported", "use separate stages for fio and native engines")
+			}
+			if stage.Native() && stage.Mode == "sequential" {
+				return E("unsupported", "use separate native stages for sequential native workloads")
 			}
 			if w.Engine == "native" {
 				if w.Workload.Direct || w.IODepth != 1 || w.Workload.IOEngine != "psync" || w.Workload.FsyncEvery != 0 || w.Workload.BlockSizeBytes > 1<<20 || w.Workload.FilesPerJob*w.NumJobs > 64 || w.Workload.CacheState != "warm" {
@@ -93,6 +116,10 @@ func (s ScenarioSpec) Validate() error {
 				}
 			}
 			spec := w.Spec(stage)
+			if w.Kind != "data" {
+				spec.Kind = "data"
+				spec.Workload.Operation = "read"
+			}
 			if err := spec.Validate(); err != nil {
 				return err
 			}
@@ -233,6 +260,12 @@ func ScenarioUsesFio(s *ScenarioSpec) bool {
 	return false
 }
 func NativeOperations(w ScenarioWorkload) []string {
+	if w.Kind == "pipeline" {
+		return w.Steps
+	}
+	if w.Kind == "metadata" {
+		return []string{"stat"}
+	}
 	if w.Workload.Operation == "randrw" {
 		return []string{"read", "write"}
 	}
@@ -240,4 +273,49 @@ func NativeOperations(w ScenarioWorkload) []string {
 		return []string{"read"}
 	}
 	return []string{"write"}
+}
+
+func validatePipeline(w ScenarioWorkload) error {
+	if w.Workload.Operation != "lifecycle" || w.Workload.FileSizeBytes != w.Workload.BlockSizeBytes || w.Workload.FilesPerJob != 1 || len(w.Steps) < 3 || len(w.Steps) > 6 || w.Steps[0] != "create" || w.Steps[len(w.Steps)-1] != "unlink" {
+		return E("invalid", "pipeline requires one block per file, one file per worker, lifecycle operation and create ... unlink steps")
+	}
+	created, written := false, false
+	seen := map[string]bool{}
+	for _, op := range w.Steps {
+		if seen[op] {
+			return E("invalid", "duplicate pipeline step")
+		}
+		seen[op] = true
+		switch op {
+		case "create":
+			if created {
+				return E("invalid", "file already exists")
+			}
+			created = true
+		case "write":
+			if !created {
+				return E("invalid", "write requires created file")
+			}
+			written = true
+		case "read", "fsync":
+			if !written {
+				return E("invalid", "read/fsync requires prior write")
+			}
+		case "stat":
+			if !created {
+				return E("invalid", "stat requires existing file")
+			}
+		case "unlink":
+			if !created {
+				return E("invalid", "unlink requires file")
+			}
+			created = false
+		default:
+			return E("unsupported", "unsupported pipeline step")
+		}
+	}
+	if !written {
+		return E("invalid", "pipeline requires a write")
+	}
+	return nil
 }
