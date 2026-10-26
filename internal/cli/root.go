@@ -63,6 +63,7 @@ func NewRoot(out, errOut io.Writer) *cobra.Command {
 	r.AddCommand(&cobra.Command{Use: "version", Short: "Show CLI and schema versions", RunE: func(c *cobra.Command, args []string) error {
 		return Output(c.OutOrStdout(), map[string]string{"version": domain.Version, "schema_version": domain.Schema})
 	}})
+	executionCommands(r, o)
 	return r
 }
 func Execute(args []string, out, errOut io.Writer) int {

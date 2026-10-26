@@ -1,0 +1,21 @@
+# Performance profile: provision sufficient capacity and increase --max-bytes explicitly.
+schema_version: '1.0'
+name: lab-random-read
+kind: data
+workload:
+  operation: randread
+  file_size_bytes: 1073741824
+  files_per_job: 1
+  block_size_bytes: 4096
+  read_percent: 100
+  ioengine: libaio
+  direct: true
+  cache_state: unknown
+  fsync_every: 0
+  runtime_seconds: 60
+  warmup_seconds: 10
+  seed: 42
+matrix:
+  numjobs: [1, 4, 16]
+  iodepth: [1, 16, 64]
+repeats: 3
