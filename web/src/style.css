@@ -1311,3 +1311,81 @@ summary {
     grid-column: 2/-1;
   }
 }
+
+/* Case library shares the white and mint visual language of benchmark views. */
+.case-library {
+  margin-bottom: 22px;
+}
+.case-toolbar,
+.case-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.case-toolbar {
+  padding: 18px 22px;
+  border-bottom: 1px solid #e7f0ea;
+}
+.case-toolbar input {
+  flex: 1;
+  min-width: 160px;
+}
+.case-padding {
+  padding: 22px;
+}
+.case-title {
+  color: #12745a;
+  font-weight: 650;
+  padding: 0;
+  text-align: left;
+}
+.case-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 640px;
+  line-height: 1.7;
+  margin: 8px 0;
+}
+.case-active {
+  background: #f0faf4;
+}
+.case-actions {
+  margin-bottom: 20px;
+}
+.case-actions label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.case-facts {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+  padding: 14px;
+  background: #f4faf6;
+  border-radius: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.case-json-label {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12px;
+  color: #557765;
+}
+.case-json-label textarea {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: #fbfdfb;
+}
+.case-picker {
+  border: 1px solid #dceee2;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #f6fcf8;
+}

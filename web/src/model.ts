@@ -110,6 +110,7 @@ export interface Plan {
   hash: string;
 }
 export interface Run {
+  case_ref?: { id: string; revision: number };
   id: string;
   request_id: string;
   source: string;

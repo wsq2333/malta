@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { Chart } from "./LazyChart";
+import { Cases, CasePicker, type CaseVersion } from "./Cases";
 import {
   Badge,
   Detail,
@@ -51,7 +52,8 @@ import {
   type Version,
 } from "./model";
 
-type Page = "baselines" | "runs" | "versions" | "environments" | "trends";
+type Page =
+  "cases" | "baselines" | "runs" | "versions" | "environments" | "trends";
 const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
   [
     {
@@ -61,6 +63,7 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
       icon: Layers3,
     },
     { id: "runs", label: "测试运行", en: "Benchmark runs", icon: Activity },
+    { id: "cases", label: "用例管理", en: "Benchmark cases", icon: Layers3 },
     {
       id: "versions",
       label: "软件版本",
@@ -120,6 +123,9 @@ export function App() {
     [baselineName, setBaselineName] = useState(""),
     [modalError, setModalError] = useState(""),
     [logs, setLogs] = useState<unknown>(null);
+  const [caseCreate, setCaseCreate] = useState(0),
+    [chosenCase, setChosenCase] = useState<CaseVersion | null>(null),
+    [startMode, setStartMode] = useState("json");
   const refresh = () => setTick((t) => t + 1);
   useEffect(() => {
     const q = new URLSearchParams();
@@ -288,6 +294,8 @@ export function App() {
     setJSONInput("");
     setRequestId("");
     setBaselineName("");
+    setChosenCase(null);
+    setStartMode("json");
     setModal(name);
   }
   function chooseEnvironment(value: string) {
@@ -306,9 +314,14 @@ export function App() {
         sessionStorage.setItem("malta-token", token);
         refresh();
       } else if (modal === "start") {
-        const plan = JSON.parse(jsonInput) as Plan;
+        if (startMode === "case" && !chosenCase)
+          throw new Error("请选择用例及固定版本");
+        const plan = chosenCase ? undefined : (JSON.parse(jsonInput) as Plan);
         const run = await api<Run>("/runs", {
           plan,
+          case_ref: chosenCase
+            ? { id: chosenCase.case_id, revision: chosenCase.revision }
+            : undefined,
           request_id: requestId,
           source: "human",
           executor,
@@ -476,35 +489,41 @@ export function App() {
                 </span>
               </h1>
               <p>
-                {page === "baselines"
-                  ? "让每一次性能变化，都有可靠的参照。"
-                  : page === "runs"
-                    ? "管理测试生命周期，追溯每一份原始证据。"
-                    : page === "versions"
-                      ? "以不可变的版本身份，串联每一次测试。"
-                      : page === "environments"
-                        ? "记录云实例与物理硬件，固定公平对照的条件。"
-                        : "在相同测试条件下，观察版本与时间带来的变化。"}
+                {page === "cases"
+                  ? "保存测试定义，以不可变版本组织每一次实验。"
+                  : page === "baselines"
+                    ? "让每一次性能变化，都有可靠的参照。"
+                    : page === "runs"
+                      ? "管理测试生命周期，追溯每一份原始证据。"
+                      : page === "versions"
+                        ? "以不可变的版本身份，串联每一次测试。"
+                        : page === "environments"
+                          ? "记录云实例与物理硬件，固定公平对照的条件。"
+                          : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
             <button
               className="primary"
               onClick={() =>
-                openModal(
-                  page === "versions"
-                    ? "version"
-                    : page === "environments"
-                      ? "environment"
-                      : "start",
-                )
+                page === "cases"
+                  ? setCaseCreate((n) => n + 1)
+                  : openModal(
+                      page === "versions"
+                        ? "version"
+                        : page === "environments"
+                          ? "environment"
+                          : "start",
+                    )
               }
             >
               <Plus size={17} />
-              {page === "versions"
-                ? "登记版本"
-                : page === "environments"
-                  ? "登记环境"
-                  : "发起测试"}
+              {page === "cases"
+                ? "新建用例"
+                : page === "versions"
+                  ? "登记版本"
+                  : page === "environments"
+                    ? "登记环境"
+                    : "发起测试"}
             </button>
           </header>
           {error && (
@@ -514,81 +533,103 @@ export function App() {
               <button onClick={refresh}>重试</button>
             </div>
           )}
-          <section className="stats">
-            <Stat
-              icon={Layers3}
-              label="已设基线"
-              value={matchingBaselines.length}
-              note="当前筛选条件"
-            />
-            <Stat
-              icon={Check}
-              label="成功实验"
-              value={successful.length}
-              note="证据已持久化"
-            />
-            <Stat
-              icon={Server}
-              label="硬件环境"
-              value={environments.length}
-              note="不可变配置快照"
-            />
-            <Stat
-              icon={Activity}
-              label="进行中"
-              value={activeCount}
-              note="准备 / 运行 / 排队"
-            />
-          </section>
-          <section className="panel filters">
-            <div className="filters-title">
-              <Settings2 size={16} /> 实验条件
-            </div>
-            <Select label="硬件环境" value={env} onChange={chooseEnvironment}>
-              <option value="">全部环境</option>
-              {environments.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name} · {e.kind}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="软件版本"
-              value={version}
-              onChange={(v) => {
-                setVersion(v);
-                setBaseline("");
-                setCandidate("");
-                setRuns([]);
-                setSelected(null);
+          {page !== "cases" && (
+            <>
+              <section className="stats">
+                <Stat
+                  icon={Layers3}
+                  label="已设基线"
+                  value={matchingBaselines.length}
+                  note="当前筛选条件"
+                />
+                <Stat
+                  icon={Check}
+                  label="成功实验"
+                  value={successful.length}
+                  note="证据已持久化"
+                />
+                <Stat
+                  icon={Server}
+                  label="硬件环境"
+                  value={environments.length}
+                  note="不可变配置快照"
+                />
+                <Stat
+                  icon={Activity}
+                  label="进行中"
+                  value={activeCount}
+                  note="准备 / 运行 / 排队"
+                />
+              </section>
+              <section className="panel filters">
+                <div className="filters-title">
+                  <Settings2 size={16} /> 实验条件
+                </div>
+                <Select
+                  label="硬件环境"
+                  value={env}
+                  onChange={chooseEnvironment}
+                >
+                  <option value="">全部环境</option>
+                  {environments.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name} · {e.kind}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  label="软件版本"
+                  value={version}
+                  onChange={(v) => {
+                    setVersion(v);
+                    setBaseline("");
+                    setCandidate("");
+                    setRuns([]);
+                    setSelected(null);
+                  }}
+                >
+                  <option value="">全部版本</option>
+                  {versions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.filesystem} {v.label}
+                    </option>
+                  ))}
+                </Select>
+                <label className="select-label">
+                  <span>起始日期</span>
+                  <input
+                    aria-label="起始日期"
+                    type="date"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                  />
+                </label>
+                <label className="select-label">
+                  <span>结束日期</span>
+                  <input
+                    aria-label="结束日期"
+                    type="date"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                  />
+                </label>
+              </section>
+            </>
+          )}
+          {page === "cases" && (
+            <Cases
+              tick={tick}
+              createSignal={caseCreate}
+              runs={runs}
+              onStart={(v) => {
+                openModal("start");
+                setStartMode("case");
+                setChosenCase(v);
+                setJSONInput(JSON.stringify(v.plan, null, 2));
+                setRequestId(`case-${crypto.randomUUID()}`);
               }}
-            >
-              <option value="">全部版本</option>
-              {versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.filesystem} {v.label}
-                </option>
-              ))}
-            </Select>
-            <label className="select-label">
-              <span>起始日期</span>
-              <input
-                aria-label="起始日期"
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </label>
-            <label className="select-label">
-              <span>结束日期</span>
-              <input
-                aria-label="结束日期"
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </label>
-          </section>
+            />
+          )}
           {(page === "baselines" || page === "runs") && (
             <section className="panel results-panel">
               <div className="panel-top">
@@ -1211,6 +1252,12 @@ export function App() {
                   <div className="eyebrow">RUN DETAIL</div>
                   <h2>{selected.plan.spec.name}</h2>
                   <p className="mono muted">{selected.id}</p>
+                  {selected.case_ref && (
+                    <p className="muted">
+                      用例 {selected.case_ref.id} · v
+                      {selected.case_ref.revision}
+                    </p>
+                  )}
                 </div>
                 <button
                   className="icon-button"
@@ -1382,9 +1429,45 @@ export function App() {
               <>
                 <p>
                   {modal === "start"
-                    ? "粘贴 malta plan 生成的完整 JSON。选择 local 在服务节点执行，或 kubernetes 在已配置的独立 Job 中执行真实 I/O。"
+                    ? "选择已保存的用例版本，或粘贴完整计划 JSON。提交前请核对目标目录、环境和软件版本，执行时仍会校验资源预算。"
                     : "粘贴与版本化 schema 一致的 JSON。相同 ID 不能覆盖不同内容；请为变更登记新 ID。"}
                 </p>
+                {modal === "start" && (
+                  <>
+                    <label>
+                      计划来源
+                      <select
+                        value={startMode}
+                        onChange={(e) => {
+                          setStartMode(e.target.value);
+                          setChosenCase(null);
+                          setJSONInput("");
+                        }}
+                      >
+                        <option value="json">粘贴计划 JSON</option>
+                        <option value="case">选择已保存的用例</option>
+                      </select>
+                    </label>
+                    {startMode === "case" && (
+                      <>
+                        <CasePicker
+                          initial={chosenCase}
+                          onSelect={(v) => {
+                            setChosenCase(v);
+                            setJSONInput(
+                              v ? JSON.stringify(v.plan, null, 2) : "",
+                            );
+                          }}
+                        />
+                        {chosenCase && (
+                          <div className="alert success">
+                            已固定：{chosenCase.name} · v{chosenCase.revision}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
                 {modal === "start" && (
                   <label>
                     执行器
@@ -1420,6 +1503,7 @@ export function App() {
                     required
                     rows={14}
                     spellCheck={false}
+                    readOnly={modal === "start" && startMode === "case"}
                     value={jsonInput}
                     onChange={(e) => setJSONInput(e.target.value)}
                     placeholder={
