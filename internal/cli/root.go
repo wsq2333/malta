@@ -64,6 +64,7 @@ func NewRoot(out, errOut io.Writer) *cobra.Command {
 		return Output(c.OutOrStdout(), map[string]string{"version": domain.Version, "schema_version": domain.Schema})
 	}})
 	executionCommands(r, o)
+	dataCommands(r, o)
 	return r
 }
 func Execute(args []string, out, errOut io.Writer) int {

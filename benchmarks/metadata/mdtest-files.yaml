@@ -1,0 +1,11 @@
+schema_version: "1.0"
+name: mdtest-file-smoke
+kind: metadata
+repeats: 1
+workload: {}
+matrix: {numjobs: [], iodepth: []}
+metadata:
+  source: mdtest-4.0.0
+  mode: files
+  tasks: "1"
+  files_per_task: "8"

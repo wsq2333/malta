@@ -130,7 +130,7 @@ func (s Spec) Validate() error {
 		return E("invalid", "invalid spec schema, name or repeats (1..20)")
 	}
 	if s.Kind == "metadata" {
-		if len(s.Metadata) == 0 {
+		if s.Metadata["source"] != "mdtest-4.0.0" || s.Metadata["mode"] != "files" || s.Metadata["tasks"] != "1" || s.Metadata["files_per_task"] == "" {
 			return E("invalid", "metadata conditions are required")
 		}
 		return nil
@@ -211,6 +211,11 @@ func NewPlan(s Spec, e Environment, v SoftwareVersion, target, group string) (Pl
 			}
 		}
 	}
+	if s.Kind == "metadata" {
+		for r := 1; r <= s.Repeats; r++ {
+			p.Trials = append(p.Trials, Point{fmt.Sprintf("metadata-r%d", r), 1, 1, r})
+		}
+	}
 	p.Hash = p.Digest()
 	return p, p.Validate()
 }
@@ -238,6 +243,15 @@ func (p Plan) Validate() error {
 		}
 		if Hash(expected) != Hash(p.Trials) {
 			return E("invalid", "plan trials do not match spec")
+		}
+	}
+	if p.Spec.Kind == "metadata" {
+		var expected []Point
+		for r := 1; r <= p.Spec.Repeats; r++ {
+			expected = append(expected, Point{fmt.Sprintf("metadata-r%d", r), 1, 1, r})
+		}
+		if Hash(expected) != Hash(p.Trials) {
+			return E("invalid", "metadata trials do not match repeats")
 		}
 	}
 	return nil
@@ -315,18 +329,34 @@ func (r Run) Validate() error {
 		return E("invalid", "invalid run status")
 	}
 	seen := map[string]bool{}
+	expected := map[string]Point{}
+	for _, p := range r.Plan.Trials {
+		expected[p.ID] = p
+	}
 	for _, t := range r.Trials {
+		if p, ok := expected[t.Point.ID]; !ok || p != t.Point {
+			return E("invalid", "unexpected trial point")
+		}
 		if seen[t.Point.ID] {
 			return E("invalid", "duplicate trial")
 		}
 		seen[t.Point.ID] = true
+		metrics := map[string]bool{}
 		for _, m := range t.Metrics {
+			key := m.Operation + "/" + m.Name
+			if metrics[key] {
+				return E("invalid", "duplicate metric")
+			}
+			metrics[key] = true
 			if err := m.Validate(); err != nil {
 				return err
 			}
 		}
+		if r.Status == "succeeded" && (t.Status != "succeeded" || len(t.Metrics) == 0) {
+			return E("invalid", "successful run contains incomplete trial")
+		}
 	}
-	if r.Status == "succeeded" && len(r.Trials) == 0 {
+	if r.Status == "succeeded" && (len(r.Trials) != len(r.Plan.Trials) || len(r.Trials) == 0 || r.ToolVersion == "") {
 		return E("invalid", "successful run must contain trials")
 	}
 	return nil

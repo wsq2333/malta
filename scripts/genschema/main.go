@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/invopop/jsonschema"
+	"github.com/wsq2333/malta/internal/artifact"
 	"github.com/wsq2333/malta/internal/domain"
 )
 
 func main() {
-	for name, v := range map[string]any{"spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}} {
+	for name, v := range map[string]any{"spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}, "bundle": artifact.Bundle{}, "baseline": domain.Baseline{}, "comparison": domain.Comparison{}} {
 		r := new(jsonschema.Reflector)
 		s := r.Reflect(v)
 		s.ID = jsonschema.ID("https://malta.local/schemas/" + name + ".json")

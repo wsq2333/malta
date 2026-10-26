@@ -1,0 +1,514 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/bundle.json",
+  "$ref": "#/$defs/Bundle",
+  "$defs": {
+    "Attempt": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "result_state": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "executor",
+        "started_at",
+        "finished_at",
+        "result_state"
+      ]
+    },
+    "Bundle": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "run": {
+          "$ref": "#/$defs/Run"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/File"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "run",
+        "files"
+      ]
+    },
+    "Environment": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "machines": {
+          "items": {
+            "$ref": "#/$defs/Machine"
+          },
+          "type": "array"
+        },
+        "os": {
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "name",
+        "kind",
+        "provider",
+        "region",
+        "machines",
+        "os",
+        "config"
+      ]
+    },
+    "File": {
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "sha256",
+        "data"
+      ]
+    },
+    "Machine": {
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "cpu": {
+          "type": "string"
+        },
+        "memory_bytes": {
+          "type": "integer"
+        },
+        "storage": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "role",
+        "model",
+        "count",
+        "cpu",
+        "memory_bytes",
+        "storage",
+        "network"
+      ]
+    },
+    "Matrix": {
+      "properties": {
+        "numjobs": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "iodepth": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "numjobs",
+        "iodepth"
+      ]
+    },
+    "Metric": {
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "operation",
+        "name",
+        "unit",
+        "value",
+        "source"
+      ]
+    },
+    "Plan": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "spec": {
+          "$ref": "#/$defs/Spec"
+        },
+        "environment": {
+          "$ref": "#/$defs/Environment"
+        },
+        "version": {
+          "$ref": "#/$defs/SoftwareVersion"
+        },
+        "target": {
+          "type": "string"
+        },
+        "resource_group": {
+          "type": "string"
+        },
+        "trials": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "type": "array"
+        },
+        "hash": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "spec",
+        "environment",
+        "version",
+        "target",
+        "resource_group",
+        "trials",
+        "hash"
+      ]
+    },
+    "Point": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "numjobs": {
+          "type": "integer"
+        },
+        "iodepth": {
+          "type": "integer"
+        },
+        "repeat": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "numjobs",
+        "iodepth",
+        "repeat"
+      ]
+    },
+    "Run": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "plan": {
+          "$ref": "#/$defs/Plan"
+        },
+        "status": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attempt": {
+          "$ref": "#/$defs/Attempt"
+        },
+        "tool_version": {
+          "type": "string"
+        },
+        "malta_version": {
+          "type": "string"
+        },
+        "trials": {
+          "items": {
+            "$ref": "#/$defs/Trial"
+          },
+          "type": "array"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "request_id",
+        "source",
+        "plan",
+        "status",
+        "created_at",
+        "updated_at",
+        "attempt",
+        "tool_version",
+        "malta_version",
+        "trials"
+      ]
+    },
+    "SoftwareVersion": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "filesystem": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "build": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "filesystem",
+        "label",
+        "commit",
+        "build"
+      ]
+    },
+    "Spec": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "workload": {
+          "$ref": "#/$defs/Workload"
+        },
+        "matrix": {
+          "$ref": "#/$defs/Matrix"
+        },
+        "repeats": {
+          "type": "integer"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "name",
+        "kind",
+        "workload",
+        "matrix",
+        "repeats"
+      ]
+    },
+    "Trial": {
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/Point"
+        },
+        "status": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "type": "array"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "point",
+        "status",
+        "started_at",
+        "finished_at",
+        "metrics"
+      ]
+    },
+    "Workload": {
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "file_size_bytes": {
+          "type": "integer"
+        },
+        "files_per_job": {
+          "type": "integer"
+        },
+        "block_size_bytes": {
+          "type": "integer"
+        },
+        "read_percent": {
+          "type": "integer"
+        },
+        "ioengine": {
+          "type": "string"
+        },
+        "direct": {
+          "type": "boolean"
+        },
+        "cache_state": {
+          "type": "string"
+        },
+        "fsync_every": {
+          "type": "integer"
+        },
+        "runtime_seconds": {
+          "type": "integer"
+        },
+        "warmup_seconds": {
+          "type": "integer"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "operation",
+        "file_size_bytes",
+        "files_per_job",
+        "block_size_bytes",
+        "read_percent",
+        "ioengine",
+        "direct",
+        "cache_state",
+        "fsync_every",
+        "runtime_seconds",
+        "warmup_seconds",
+        "seed"
+      ]
+    }
+  }
+}
