@@ -118,7 +118,8 @@ type Matrix struct {
 	IODepth []int `json:"iodepth"`
 }
 type Spec struct {
-	SchemaVersion string            `json:"schema_version" jsonschema:"enum=1.0"`
+	Scenario      *ScenarioSpec     `json:"scenario,omitempty"`
+	SchemaVersion string            `json:"schema_version" jsonschema:"enum=1.0,enum=scenario/v1alpha1"`
 	Name          string            `json:"name"`
 	Kind          string            `json:"kind"`
 	Workload      Workload          `json:"workload"`
@@ -128,6 +129,16 @@ type Spec struct {
 }
 
 func (s Spec) Validate() error {
+	if s.Kind == "scenario" {
+		if s.SchemaVersion != ScenarioSchema || s.Scenario == nil || s.Name != s.Scenario.Name || s.Repeats != s.Scenario.Repeats || s.Workload != (Workload{}) || len(s.Matrix.NumJobs) != 0 || len(s.Matrix.IODepth) != 0 || len(s.Metadata) != 0 {
+			return E("invalid", "inconsistent scenario wrapper")
+		}
+		return s.Scenario.Validate()
+	}
+	if s.Scenario != nil {
+		return E("invalid", "scenario is only valid for scenario kind")
+	}
+
 	if s.SchemaVersion != Schema || s.Name == "" || s.Repeats < 1 || s.Repeats > 20 {
 		return E("invalid", "invalid spec schema, name or repeats (1..20)")
 	}
@@ -186,13 +197,15 @@ func hasDuplicates(v []int) bool {
 }
 
 type Point struct {
-	ID      string `json:"id"`
-	NumJobs int    `json:"numjobs"`
-	IODepth int    `json:"iodepth"`
-	Repeat  int    `json:"repeat"`
+	ID         string `json:"id"`
+	NumJobs    int    `json:"numjobs"`
+	IODepth    int    `json:"iodepth"`
+	Repeat     int    `json:"repeat"`
+	StageID    string `json:"stage_id,omitempty"`
+	WorkloadID string `json:"workload_id,omitempty"`
 }
 type Plan struct {
-	SchemaVersion string          `json:"schema_version" jsonschema:"enum=1.0"`
+	SchemaVersion string          `json:"schema_version" jsonschema:"enum=1.0,enum=scenario/v1alpha1"`
 	Spec          Spec            `json:"spec"`
 	Environment   Environment     `json:"environment"`
 	Version       SoftwareVersion `json:"version"`
@@ -208,14 +221,14 @@ func NewPlan(s Spec, e Environment, v SoftwareVersion, target, group string) (Pl
 		for _, n := range s.Matrix.NumJobs {
 			for _, d := range s.Matrix.IODepth {
 				for r := 1; r <= s.Repeats; r++ {
-					p.Trials = append(p.Trials, Point{fmt.Sprintf("n%d-d%d-r%d", n, d, r), n, d, r})
+					p.Trials = append(p.Trials, Point{ID: fmt.Sprintf("n%d-d%d-r%d", n, d, r), NumJobs: n, IODepth: d, Repeat: r})
 				}
 			}
 		}
 	}
 	if s.Kind == "metadata" {
 		for r := 1; r <= s.Repeats; r++ {
-			p.Trials = append(p.Trials, Point{fmt.Sprintf("metadata-r%d", r), 1, 1, r})
+			p.Trials = append(p.Trials, Point{ID: fmt.Sprintf("metadata-r%d", r), NumJobs: 1, IODepth: 1, Repeat: r})
 		}
 	}
 	p.Hash = p.Digest()
@@ -223,7 +236,7 @@ func NewPlan(s Spec, e Environment, v SoftwareVersion, target, group string) (Pl
 }
 func (p Plan) Digest() string { p.Hash = ""; return Hash(p) }
 func (p Plan) Validate() error {
-	if p.SchemaVersion != Schema || p.Hash != p.Digest() {
+	if p.SchemaVersion != p.Spec.SchemaVersion || (p.SchemaVersion != Schema && p.SchemaVersion != ScenarioSchema) || p.Hash != p.Digest() {
 		return E("invalid", "plan schema or checksum mismatch")
 	}
 	for _, err := range []error{p.Spec.Validate(), p.Environment.Validate(), p.Version.Validate(), CheckID(p.ResourceGroup)} {
@@ -234,12 +247,15 @@ func (p Plan) Validate() error {
 	if !filepath.IsAbs(p.Target) || filepath.Clean(p.Target) == string(filepath.Separator) {
 		return E("invalid", "target must be an absolute non-root directory")
 	}
+	if p.Spec.Kind == "scenario" && Hash(p.Spec.Scenario.Points()) != Hash(p.Trials) {
+		return E("invalid", "scenario points differ from definition")
+	}
 	if p.Spec.Kind == "data" {
 		var expected []Point
 		for _, n := range p.Spec.Matrix.NumJobs {
 			for _, d := range p.Spec.Matrix.IODepth {
 				for r := 1; r <= p.Spec.Repeats; r++ {
-					expected = append(expected, Point{fmt.Sprintf("n%d-d%d-r%d", n, d, r), n, d, r})
+					expected = append(expected, Point{ID: fmt.Sprintf("n%d-d%d-r%d", n, d, r), NumJobs: n, IODepth: d, Repeat: r})
 				}
 			}
 		}
@@ -250,7 +266,7 @@ func (p Plan) Validate() error {
 	if p.Spec.Kind == "metadata" {
 		var expected []Point
 		for r := 1; r <= p.Spec.Repeats; r++ {
-			expected = append(expected, Point{fmt.Sprintf("metadata-r%d", r), 1, 1, r})
+			expected = append(expected, Point{ID: fmt.Sprintf("metadata-r%d", r), NumJobs: 1, IODepth: 1, Repeat: r})
 		}
 		if Hash(expected) != Hash(p.Trials) {
 			return E("invalid", "metadata trials do not match repeats")
@@ -301,7 +317,7 @@ type Attempt struct {
 	ResultState string    `json:"result_state"`
 }
 type Run struct {
-	SchemaVersion string    `json:"schema_version" jsonschema:"enum=1.0"`
+	SchemaVersion string    `json:"schema_version" jsonschema:"enum=1.0,enum=scenario/v1alpha1"`
 	ID            string    `json:"id"`
 	RequestID     string    `json:"request_id"`
 	Source        string    `json:"source"`
@@ -321,10 +337,10 @@ func Terminal(s string) bool {
 }
 func NewRun(p Plan, source string) Run {
 	now := time.Now().UTC()
-	return Run{SchemaVersion: Schema, ID: ID("run"), Source: source, Plan: p, Status: "pending", CreatedAt: now, UpdatedAt: now, MaltaVersion: Version, Trials: []Trial{}, Attempt: Attempt{ID: ID("attempt"), Status: "pending", Executor: "local", ResultState: "pending"}}
+	return Run{SchemaVersion: p.SchemaVersion, ID: ID("run"), Source: source, Plan: p, Status: "pending", CreatedAt: now, UpdatedAt: now, MaltaVersion: Version, Trials: []Trial{}, Attempt: Attempt{ID: ID("attempt"), Status: "pending", Executor: "local", ResultState: "pending"}}
 }
 func (r Run) Validate() error {
-	if r.SchemaVersion != Schema {
+	if r.SchemaVersion != r.Plan.SchemaVersion || (r.SchemaVersion != Schema && r.SchemaVersion != ScenarioSchema) {
 		return E("invalid", "unsupported run schema")
 	}
 	if err := CheckID(r.ID); err != nil {

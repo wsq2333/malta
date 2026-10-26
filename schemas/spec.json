@@ -25,12 +25,78 @@
         "iodepth"
       ]
     },
-    "Spec": {
+    "ScenarioSpec": {
       "properties": {
         "schema_version": {
           "type": "string",
           "enum": [
-            "1.0"
+            "scenario/v1alpha1"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "repeats": {
+          "type": "integer"
+        },
+        "failure_policy": {
+          "type": "string"
+        },
+        "stages": {
+          "items": {
+            "$ref": "#/$defs/Stage"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "name",
+        "repeats",
+        "failure_policy",
+        "stages"
+      ]
+    },
+    "ScenarioWorkload": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "numjobs": {
+          "type": "integer"
+        },
+        "iodepth": {
+          "type": "integer"
+        },
+        "workload": {
+          "$ref": "#/$defs/Workload"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "numjobs",
+        "iodepth",
+        "workload"
+      ]
+    },
+    "Spec": {
+      "properties": {
+        "scenario": {
+          "$ref": "#/$defs/ScenarioSpec"
+        },
+        "schema_version": {
+          "type": "string",
+          "enum": [
+            "1.0",
+            "scenario/v1alpha1"
           ]
         },
         "name": {
@@ -64,6 +130,41 @@
         "workload",
         "matrix",
         "repeats"
+      ]
+    },
+    "Stage": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "warmup_seconds": {
+          "type": "integer"
+        },
+        "runtime_seconds": {
+          "type": "integer"
+        },
+        "dataset_policy": {
+          "type": "string"
+        },
+        "workloads": {
+          "items": {
+            "$ref": "#/$defs/ScenarioWorkload"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "mode",
+        "warmup_seconds",
+        "runtime_seconds",
+        "dataset_policy",
+        "workloads"
       ]
     },
     "Workload": {

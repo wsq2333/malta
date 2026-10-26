@@ -12,7 +12,7 @@ import (
 )
 
 func executionCommands(root *cobra.Command, o *Options) {
-	var spec, env, ver, target, group, output string
+	var spec, scenario, env, ver, target, group, output string
 	plan := &cobra.Command{Use: "plan", Short: "Validate and expand a workload without running I/O", Args: cobra.NoArgs, RunE: func(c *cobra.Command, _ []string) error {
 		var s domain.Spec
 		var e domain.Environment
@@ -20,12 +20,28 @@ func executionCommands(root *cobra.Command, o *Options) {
 		for _, x := range []struct {
 			p string
 			v any
-		}{{spec, &s}, {env, &e}, {ver, &v}} {
+		}{{env, &e}, {ver, &v}} {
 			if err := domain.Read(x.p, x.v); err != nil {
 				return err
 			}
 		}
-		p, err := domain.NewPlan(s, e, v, target, group)
+		var p domain.Plan
+		var err error
+		if (spec == "") == (scenario == "") {
+			return domain.E("invalid", "provide exactly one of --spec or --scenario")
+		}
+		if scenario != "" {
+			var sc domain.ScenarioSpec
+			if err = domain.Read(scenario, &sc); err != nil {
+				return err
+			}
+			p, err = domain.NewScenarioPlan(sc, e, v, target, group)
+		} else {
+			if err = domain.Read(spec, &s); err != nil {
+				return err
+			}
+			p, err = domain.NewPlan(s, e, v, target, group)
+		}
 		if err != nil {
 			return err
 		}
@@ -36,12 +52,13 @@ func executionCommands(root *cobra.Command, o *Options) {
 	}}
 	f := plan.Flags()
 	f.StringVar(&spec, "spec", "", "Workload JSON/YAML")
+	f.StringVar(&scenario, "scenario", "", "Multi-workload scenario JSON/YAML")
 	f.StringVar(&env, "environment", "", "Environment JSON/YAML")
 	f.StringVar(&ver, "version", "", "Version JSON/YAML")
 	f.StringVar(&target, "target", "", "Existing absolute benchmark target directory")
 	f.StringVar(&group, "resource-group", "default", "Exclusive resource identity")
 	f.StringVar(&output, "out", "plan.json", "Plan destination")
-	for _, name := range []string{"spec", "environment", "version", "target"} {
+	for _, name := range []string{"environment", "version", "target"} {
 		_ = plan.MarkFlagRequired(name)
 	}
 	var input, out, bin string

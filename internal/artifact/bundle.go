@@ -20,13 +20,13 @@ type File struct {
 	Data   []byte `json:"data"`
 }
 type Bundle struct {
-	SchemaVersion string     `json:"schema_version" jsonschema:"enum=1.0"`
+	SchemaVersion string     `json:"schema_version" jsonschema:"enum=1.0,enum=scenario/v1alpha1"`
 	Run           domain.Run `json:"run"`
 	Files         []File     `json:"files"`
 }
 
 func (b Bundle) Validate() error {
-	if b.SchemaVersion != domain.Schema {
+	if b.SchemaVersion != b.Run.SchemaVersion || (b.SchemaVersion != domain.Schema && b.SchemaVersion != domain.ScenarioSchema) {
 		return domain.E("invalid", "unsupported bundle schema")
 	}
 	if err := b.Run.Validate(); err != nil {
@@ -44,7 +44,7 @@ func (b Bundle) Validate() error {
 	return nil
 }
 func Collect(dir string, r domain.Run) (Bundle, error) {
-	b := Bundle{SchemaVersion: domain.Schema, Run: r, Files: []File{}}
+	b := Bundle{SchemaVersion: r.SchemaVersion, Run: r, Files: []File{}}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, e error) error {
 		if e != nil {
 			return e
