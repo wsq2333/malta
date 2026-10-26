@@ -35,8 +35,8 @@ func executeScenario(ctx context.Context, result *domain.Run, out, data string, 
 	for repeat := 1; repeat <= sc.Repeats; repeat++ {
 		for _, stage := range sc.Stages {
 			if stage.Native() {
-				result.Status = "running"
-				result.Attempt.Status = "running"
+				result.Status = "preparing"
+				result.Attempt.Status = "preparing"
 				if err := update(); err != nil {
 					return err
 				}
@@ -62,7 +62,34 @@ func executeScenario(ctx context.Context, result *domain.Run, out, data string, 
 					stdout.Close()
 					return err
 				}
-				err = process(ctx, binary, []string{"internal-native", "--input", input}, stdout, stderr)
+				childCtx, kill := context.WithCancel(ctx)
+				done := make(chan error, 1)
+				go func() {
+					done <- process(childCtx, binary, []string{"internal-native", "--input", input}, stdout, stderr)
+				}()
+				ticker := time.NewTicker(100 * time.Millisecond)
+			waiting:
+				for {
+					select {
+					case err = <-done:
+						break waiting
+					case <-ticker.C:
+						if result.Status == "preparing" {
+							if _, e := os.Stat(filepath.Join(out, fmt.Sprintf("native-r%d-%s-window.json", repeat, stage.ID))); e == nil {
+								result.Status = "running"
+								result.Attempt.Status = "running"
+								if e = update(); e != nil {
+									kill()
+									<-done
+									err = e
+									break waiting
+								}
+							}
+						}
+					}
+				}
+				ticker.Stop()
+				kill()
 				stdout.Close()
 				stderr.Close()
 				if err != nil {

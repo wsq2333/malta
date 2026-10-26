@@ -9,10 +9,18 @@ import (
 
 func TestSchemaExamples(t *testing.T) {
 	p := FixturePlan(t)
+	raw, e := os.ReadFile("../../benchmarks/scenarios/mixed-data.yaml")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var source any
+	if e = Decode(raw, &source); e != nil {
+		t.Fatal(e)
+	}
 	for _, tt := range []struct {
 		name string
 		v    any
-	}{{"spec", p.Spec}, {"environment", p.Environment}, {"version", p.Version}, {"plan", p}} {
+	}{{"spec", p.Spec}, {"environment", p.Environment}, {"version", p.Version}, {"plan", p}, {"scenario", source}} {
 		t.Run(tt.name, func(t *testing.T) {
 			b, err := os.ReadFile("../../schemas/" + tt.name + ".json")
 			if err != nil {

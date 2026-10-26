@@ -3,6 +3,7 @@ package fio
 import (
 	"encoding/csv"
 	"github.com/wsq2333/malta/internal/domain"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ func Window(data []byte) (time.Time, time.Time, error) {
 			return time.Time{}, time.Time{}, domain.E("invalid", "IOPS samples require epoch milliseconds")
 		}
 		value, e := strconv.ParseFloat(strings.TrimSpace(row[1]), 64)
-		if e != nil || value < 0 {
+		if e != nil || value < 0 || math.IsNaN(value) || math.IsInf(value, 0) {
 			return time.Time{}, time.Time{}, domain.E("invalid", "invalid sample value")
 		}
 		if value == 0 {

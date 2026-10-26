@@ -1248,13 +1248,66 @@ summary {
   }
 }
 
-.scenario-view { margin: 24px 0; }
-.scenario-stage { border: 1px solid #dcece3; border-radius: 14px; padding: 18px; margin: 14px 0; background: #fbfefc; }
-.scenario-stage header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.scenario-workloads { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; margin: 16px 0; }
-.scenario-workloads > div { display: flex; flex-direction: column; gap: 7px; padding: 14px; background: white; border-radius: 10px; border: 1px solid #e6efe9; }
-.scenario-repeat { padding: 12px 0; border-top: 1px solid #e6efe9; }
-.scenario-timeline-row { display: grid; grid-template-columns: 120px minmax(80px,1fr) 90px 100px; gap: 10px; align-items: center; margin-top: 10px; }
-.scenario-track { height: 16px; background: #eaf4ee; position: relative; border-radius: 5px; overflow: hidden; }
-.scenario-track > div { position: absolute; height: 100%; background: #48b98e; border-radius: 5px; }
-@media(max-width:700px){.scenario-timeline-row{grid-template-columns:90px 1fr 80px}.scenario-timeline-row small{grid-column:2/-1}}
+.scenario-view {
+  margin: 24px 0;
+}
+.scenario-stage {
+  border: 1px solid #dcece3;
+  border-radius: 14px;
+  padding: 18px;
+  margin: 14px 0;
+  background: #fbfefc;
+}
+.scenario-stage header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.scenario-workloads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.scenario-workloads > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e6efe9;
+}
+.scenario-repeat {
+  padding: 12px 0;
+  border-top: 1px solid #e6efe9;
+}
+.scenario-timeline-row {
+  display: grid;
+  grid-template-columns: 120px minmax(80px, 1fr) 90px 100px;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+.scenario-track {
+  height: 16px;
+  background: #eaf4ee;
+  position: relative;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.scenario-track > div {
+  position: absolute;
+  height: 100%;
+  background: #48b98e;
+  border-radius: 5px;
+}
+@media (max-width: 700px) {
+  .scenario-timeline-row {
+    grid-template-columns: 90px 1fr 80px;
+  }
+  .scenario-timeline-row small {
+    grid-column: 2/-1;
+  }
+}

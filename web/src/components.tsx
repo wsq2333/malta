@@ -192,7 +192,13 @@ export function RunMetrics({ run }: { run: Run }) {
               {summaries.map((s) => (
                 <tr key={s.key}>
                   <td>
-                    {s.stage_id && <small>{s.stage_id} / {s.workload_id}<br /></small>}{s.operation} · {metricLabel[s.metric]}
+                    {s.stage_id && (
+                      <small>
+                        {s.stage_id} / {s.workload_id}
+                        <br />
+                      </small>
+                    )}
+                    {s.operation} · {metricLabel[s.metric]}
                   </td>
                   <td>
                     {s.numjobs} × {s.iodepth}

@@ -86,3 +86,9 @@ response, lookup first; retries use the same plan, source, executor and request 
 Kubernetes server restart reconciles the original Job and does not replay I/O.
 The skill session helper checkpoints before submission and locks its session file;
 new conversations can resume without knowing any database paths or tables.
+
+## Mixed workload scenarios
+
+Use `plan --scenario benchmarks/scenarios/mixed-data.yaml` instead of `--spec`; the two flags are mutually exclusive. The resulting versioned plan uses the existing exec/run/import/export/baseline/compare commands. See [scenario definitions and engine limits](mixed-workloads.md). `result list --kind scenario` filters scenario runs.
+
+Capabilities advertise scenario_plan, scenario_sequential, scenario_parallel, scenario_weighted, scenario_pipeline and scenario_metadata_stat. The existing metadata_execution=false flag continues to describe standalone mdtest plans; native stat/lifecycle execution is scoped to scenarios. All-native scenarios do not require fio.

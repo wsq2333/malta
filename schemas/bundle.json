@@ -443,6 +443,60 @@
         "trials"
       ]
     },
+    "ScenarioParameters": {
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "file_size_bytes": {
+          "type": "integer"
+        },
+        "files_per_job": {
+          "type": "integer"
+        },
+        "block_size_bytes": {
+          "type": "integer"
+        },
+        "read_percent": {
+          "type": "integer"
+        },
+        "ioengine": {
+          "type": "string"
+        },
+        "direct": {
+          "type": "boolean"
+        },
+        "cache_state": {
+          "type": "string"
+        },
+        "fsync_every": {
+          "type": "integer"
+        },
+        "runtime_seconds": {
+          "type": "integer"
+        },
+        "warmup_seconds": {
+          "type": "integer"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "operation",
+        "file_size_bytes",
+        "files_per_job",
+        "block_size_bytes",
+        "read_percent",
+        "ioengine",
+        "direct",
+        "cache_state",
+        "fsync_every",
+        "seed"
+      ]
+    },
     "ScenarioSpec": {
       "properties": {
         "schema_version": {
@@ -501,7 +555,7 @@
           "type": "integer"
         },
         "workload": {
-          "$ref": "#/$defs/Workload"
+          "$ref": "#/$defs/ScenarioParameters"
         }
       },
       "additionalProperties": false,

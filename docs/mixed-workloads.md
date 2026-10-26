@@ -1,27 +1,25 @@
-# 多负载场景定义草案
+# 多负载场景
 
-状态：设计提案，尚未实现。本文 YAML 不可直接传给当前 `malta plan --spec`。现有 schema 1.0、单负载执行、旧结果导入与基线比较保持原有语义。
+已实现版本 `scenario/v1alpha1`：顺序/并行 fio、按操作次数加权的原生 I/O 与 stat，以及逐文件生命周期流水线。通过 `plan --scenario` 生成计划，继续使用原有 exec、run、result、baseline、compare 命令。旧单负载 schema 1.0 的计划哈希与导入保持兼容。
 
-## 参考与目标
+设计参考 EMC Mongoose 的 [Scenario](https://emc-mongoose.github.io/mongoose/howto.html#scenario)、[Weighted Load](https://github.com/emc-mongoose/mongoose-load-step-weighted) 和 [Pipeline](https://github.com/emc-mongoose/mongoose-load-step-pipeline) 组合方式。Malta 使用自己的声明式契约，不直接执行 Mongoose 配置或脚本。
 
-按 EMC Mongoose 存储压测工具理解本次参考：其 [Scenario 文档](https://emc-mongoose.github.io/mongoose/howto.html#scenario) 提供顺序、并行及配置继承；[Weighted Load](https://github.com/emc-mongoose/mongoose-load-step-weighted) 通过共享权重节流协调不同操作生成器；[Pipeline](https://github.com/emc-mongoose/mongoose-load-step-pipeline) 将同一对象依次传给不同操作，并支持操作间延迟。
+## 支持范围
 
-Malta 借鉴组合方式，使用声明式 JSON/YAML，保留负载、版本、硬件、证据和可比性契约。这里是 Malta 自己的设计，不承诺直接兼容 Mongoose 配置或执行其脚本。
-
-## 四种明确的组合语义
-
-| 模式 | 含义 | 示例 |
+| 模式 | 引擎与行为 | 示例 |
 | --- | --- | --- |
-| sequential | 一个完整子负载结束后开始下一个 | 大文件写入结束，再执行小文件随机读 |
-| parallel | 多种子负载在同一测量窗口内共同施压，各自配置 worker 和深度 | 4 KiB 随机读与 1 MiB 顺序写同时运行 |
-| weighted | 共享调度器按声明单位分配操作，记录目标与实际比例 | 70% 随机读、20% 顺序写、10% stat，按操作次数计 |
-| pipeline | 同一文件按依赖顺序完成一组操作，多文件之间可并发 | create → write → fsync → stat → read → unlink |
+| sequential | fio 子负载依次测量，统一在阶段测量前完成准备 | 修改 mixed-data 的 mode |
+| parallel | 同阶段子负载并行；阶段内全部使用 fio 或全部 native | mixed-data.yaml |
+| weighted | native 共享调度器按提交操作次数控制权重 | weighted-data.yaml、weighted-metadata.yaml |
+| pipeline | native；每个 worker 反复执行同一个文件的完整生命周期，各 worker 可并发 | pipeline.yaml |
 
-`parallel` 的 worker 数量比例不等于实际 IOPS 或字节比例。`weighted` 首先定义操作次数权重；按字节权重属于独立扩展，不能与无数据字节的 stat 混用。pipeline 是逐文件依赖，sequential 是整个阶段依赖。
+阶段列表始终依次执行。原生阶段需要顺序执行不同负载时，将其分成多个阶段。当前不支持同一阶段混用 fio 和 native，不支持多 Pod 同步。整个场景作为一个 Run，占用一次资源锁；独立 Run 继续串行排队。
 
-## 第一阶段定义示例
+原生引擎 `malta-native-1` 的首版边界：buffered psync、iodepth=1、cache_state=warm、不使用 fsync_every、块大小不超过 1 MiB、每个子负载最多 64 个文件。单阶段最多 256 workers、16 个子负载；最多 16 阶段、20 次重复、128 个展开后的子负载实验。不支持的选项会明确拒绝。
 
-采用独立的 `ScenarioSpec`，复用现有 `Workload` 字段；阶段为顺序列表，阶段内部选择组合模式。首阶段不支持递归场景，以限制展开规模。以下数值是功能验证模板，不是推荐性能测试规模。
+原生数据操作支持 read/write/randread/randwrite/randrw；独立元数据操作支持 stat。创建和删除通过 pipeline 表达，避免未统计的隐含清理改变压测负载。pipeline 当前每个 worker 使用一个单块文件，文件大小等于 I/O 块大小；支持 create、write、fsync、stat、read、unlink，每种步骤至多一次。必须以 create 开始、unlink 结束并包含 write，read/fsync 必须在 write 后。前序失败即停止后续步骤。暂不提供操作间延迟、共享文件竞争或任意依赖图。
+
+## 定义与启动
 
 ```yaml
 schema_version: scenario/v1alpha1
@@ -67,13 +65,29 @@ stages:
           seed: 43
 ```
 
-重复整个场景三次，每次使用新的数据目录。单阶段容量为 2 × 8 MiB + 1 × 32 MiB = 48 MiB，保留三次数据需要 144 MiB，不包含日志与证据。时长由阶段统一控制，展开到执行计划时填入每个子负载，不允许子负载覆盖阶段窗口。parallel 固定组合同时执行；第一阶段不对多个子负载矩阵做隐式笛卡尔积。
+时长在阶段定义，子负载内不允许重复指定。repeats 重复整个场景，每次创建新的专用目录。parallel 固定组合共同施压，不对多个子负载做隐式矩阵笛卡尔积。子负载共用被测挂载、各用独立文件目录；不改变已有业务文件。
 
-同一被测挂载下给每个子负载独立数据目录，使其共享存储资源但不互相改写文件。所有准备工作完成后才能开始并行测量，记录每个子负载的实际起止时间和窗口重叠情况；不能只凭配置认定同步成功。整个场景持有一次资源锁，内部子负载不能分别争抢同一把现有运行锁。无关 Run 仍按现有队列串行。
+```sh
+mkdir -p /tmp/malta-data
+bin/malta plan --scenario benchmarks/scenarios/mixed-data.yaml \
+  --environment environments/local.yaml --version environments/version-example.yaml \
+  --target /tmp/malta-data --resource-group shared-device --out /tmp/mixed-plan.json
+bin/malta exec --plan /tmp/mixed-plan.json --out /tmp/mixed-result \
+  --fio /path/to/fio --timeout 2m --max-bytes 1073741824
 
-## 权重与文件依赖的后续定义
+# 或交给已启动、允许访问目标目录的服务：
+bin/malta --server http://127.0.0.1:8080 run start \
+  --plan /tmp/mixed-plan.json --request-id mixed-001 --source agent
+bin/malta --server http://127.0.0.1:8080 run wait RUN_ID --timeout 2m
+```
 
-weighted 阶段拟增加：
+全原生场景不调用 fio；含 fio 阶段时需要 fio 3.33。Kubernetes 使用相同计划与 `--executor kubernetes`，目标为 `/bench`，环境快照须匹配执行器；Server 与 Runner 都必须升级到支持 scenario/v1alpha1 的二进制/镜像。
+
+以上示例每次准备 2 × 8 MiB + 1 × 32 MiB = 48 MiB，三次保留数据共 144 MiB，不含日志。预算按所有重复的准备量计算；pipeline 采用保守容量上界，即使正常完成时文件已 unlink。测量预算按顺序累加、并行取阶段时长；总 deadline 还包括准备和证据收集。
+
+## 权重与测量口径
+
+weighted 使用如下字段，并给每个子负载显式设置 `engine: native`：
 
 ```yaml
 mix:
@@ -85,42 +99,35 @@ mix:
   seed: 42
 ```
 
-此片段需配合三个对应子负载定义，不是完整可执行配置。每个 data 操作计一次指定块大小的 I/O，stat 计一次系统操作；不得混淆为读取整个文件的次数。准备、预热、隐含文件打开等辅助操作不纳入目标配比，但需说明测量口径。
+权重为 1..10000 的正整数，按总和归一化；每个子负载必须恰好有一个权重。共享 smooth weighted round-robin 调度器按操作提交分配机会，seed 固定相同权重时的顺序；被选负载的 worker 繁忙时施加背压，不跳过它来悄悄改变配比。worker 数量比例不代表操作数比例。权重也不代表字节比例：一次数据操作是一次指定块大小的 ReadAt/WriteAt，一次 stat 是一次路径查询。
 
-权重作用于测量窗口中提交的逻辑操作，比例按权重总和归一化。记录各类提交数、成功数、错误数、实际字节数、目标比例和实际比例；失败的操作仍计入提交分母。记录有限窗口下的偏差及停止时未完成操作，不承诺成功完成的操作比例严格等于目标。任何偏差验收阈值必须显式进入计划，不能事后用归一化隐藏偏差。
+每个子负载保留 submitted、succeeded、errors、late；UI 按重复显示目标/实际提交比例。预热和准备不计入这些计数。以固定测量窗口内提交的操作为分母；在窗口之后完成的操作标为 late，不计入吞吐或延迟直方图。有限窗口和在途操作会产生配比偏差，当前展示实测偏差，不自动设置配比达标阈值。
 
-独立 fio 进程的 `numjobs` 或 IOPS 上限不能替代跨操作共享权重调度。通用 weighted 需要可按操作调度的引擎适配层，或经固定版本验证的引擎原生能力；不能把多个独立限速负载标为精确加权。
+原生 I/O 在独立子进程执行，便于超时和取消时终止整个进程组。prepare 不计入测量。pipeline 一旦开始处理一个文件就按依赖完成其生命周期，窗口结束后不启动新的文件周期；窗口之后开始的收尾步骤不计入测量，仍受整个 Run 的 deadline 约束。
 
-pipeline 需要记录文件身份、步骤依赖、文件状态与有界队列；create 失败的文件不能继续执行 read。共享文件的写入、删除与读取竞争必须显式定义，第一阶段只接受 isolated_per_workload。当前 mdtest 仅支持结果导入，数据与元数据实时混合需要先实现元数据执行器及相关证据校验。
+fio 子负载保存 100ms、Unix 时间戳的 IOPS 采样，以非零样本的首尾作为保守观测区间。原生子负载保存固定计数窗口及实际完成 I/O 的首尾。并行、weighted 和 pipeline 阶段的共同观测区间必须达到配置测量时间的 50%，否则整个场景失败，不能固定为成功基线。此规则随当前场景协议固定。
 
-## 执行、结果与展示
+## 结果、证据与比较
 
-场景作为一个顶层 Run，避免把并行子负载作为独立队列任务而意外串行化。建议新增独立的场景模型与版本分派，保留既有 Run 1.0 的反序列化与哈希；不要仅在旧结构里增加默认字段而悄悄改变旧计划摘要。
+数据库仍使用 objects/runs。场景 Run、Plan 和 Bundle 明确标记 scenario/v1alpha1，API envelope 仍为 1.0。完整定义位于 `plan.spec.scenario`，展开后的 Trial 通过 `point.stage_id`、`point.workload_id`、`point.repeat` 定位；没有新建独立子 Run，也没有把子负载作为重复样本。
 
-```text
-ScenarioRun
-  scenario_snapshot + environment + version + plan_hash
-  attempt
-  repetitions[]
-    stages[]
-      workloads[]
-        actual_start/end + status + metrics + evidence
+结果包保留 `plan.json`、fio 命令/输出/IOPS 日志，或原生 `native.json` 计数与直方图，以及失败日志。导入重新检查子负载参数、窗口、工具身份和从原始证据推导的指标。原生直方图使用纳秒的二次幂区间，展示 `latency_p99_upper`（桶上界），不冒充精确 P99 或 fio clat P99。其计时区间是对应文件操作调用，排除调度等待与文件选择；调度开销仍影响总体吞吐。
+
+UI “混合场景”页签可按版本、环境查看场景，展开后展示阶段、子负载、各重复时间线、权重计数及独立指标。对照与趋势的指标键包含阶段/子负载，避免同并发配置合并。原生与 fio 使用不同工具身份。跨版本比较必须固定完整场景拓扑、引擎、负载参数、权重、共享策略、时间窗口、重复和硬件；名称变化不影响可比性。
+
+不计算混合场景的整体 P99，也不直接相加不同窗口的平均吞吐。创建/关闭文件的辅助开销、缓存环境和采样开销均属于解释结果时的条件；这些功能验收不代表分布式文件系统的性能基线。
+
+## 验收
+
+```sh
+go test -race ./...
+go vet ./...
+pnpm --dir web test
+pnpm --dir web build
+python3 scripts/scenario-smoke.py --malta /absolute/path/to/malta \
+  --fio /absolute/path/to/fio --out /tmp/malta-scenarios-new
 ```
 
-各子负载指标由 stage_id、workload_id、参数点、操作和指标名共同定位。重复摘要以整个场景的一次重复为单位，不能将不同子负载作为重复样本。证据路径按 repeat/stage/workload 分隔，保存展开配置、工具命令、原始输出与校验和。
+smoke 脚本在新建目录启动临时 loopback 服务，用小规模真实 I/O 验证五类场景、幂等提交、导入导出、基线比较、70:30/70:20:10 配比和取消后的子进程清理。结果保留在输出目录，服务自动退出。生产 CSI、固定硬件性能与多客户端同步需要独立验收。
 
-结果/UI 展示阶段时间线、并行子负载列表、实际窗口、独立吞吐/IOPS/P99，以及 weighted 的目标/实际操作比例。整体吞吐必须基于共同窗口内的真实字节数和持续时间计算，不能直接相加不同窗口的平均速率。不能平均子负载 P99 得到整体 P99；只有具有一致口径的原始直方图时才另行计算。
-
-基线比较固定整个场景的拓扑、负载配置、权重口径、数据共享策略、预热/测量窗口、重复数、工具版本和硬件条件，再逐个对齐子负载。子负载缺失、失败或同步不满足约定时，不产生成功的混合场景基线。比较可保留完整子负载诊断，但不将部分成功当作整体成功。
-
-SQLite 可先延续 JSON 快照存储，不必立即拆出多张关系表；需要显式区分场景记录与旧单负载记录，并扩展查询、导入、比较和 UI 的版本处理。Agent 能力发现应公布可支持的组合模式与上限，未实现的模式直接拒绝。
-
-## 实现顺序与验收
-
-1. **定义与计划**：新增版本化 ScenarioSpec/ScenarioPlan、schema、校验与预算展开，保留旧 plan 哈希和导入；验证唯一 ID、总容量、累计时间和最大并发。
-2. **文件 I/O 组合执行**：实现 sequential/parallel，统一准备、同步测量、取消和失败回收。评估 fio 多 job 分组；当前解析器只接受一个 group，必须同时升级分组解析与原始选项核验。可参考 [fio 分组报告文档](https://fio.readthedocs.io/en/latest/fio_doc.html#measurements-and-reporting)，实际实现仍需在项目固定的 fio 3.33 验证。
-3. **持久化与 UI**：接入托管运行、本地/Kubernetes 单 Runner Pod、结果包导入导出、分组比较、场景页面和 Agent 能力发现。任何新增类型都必须经过原始证据验证，不能绕开现有导入保证。
-4. **按操作加权**：实现共享调度、固定随机种子、目标/实际比例与计数证据；在不同操作延迟和失败条件下验证比重与统计口径。
-5. **元数据与流水线**：增加元数据原生执行、文件状态机、共享数据策略和生命周期压测；多 Pod 同步作为后续独立阶段。
-
-每步单独 commit。运行层验收使用指定 Linux 开发机的临时数据目录；验证并行确实重叠、准备不混入测量、取消无残留、失败保留证据、Kubernetes 恢复不重放，以及旧单负载结果仍能导入和比较。设计文档提交不代表上述执行验收已完成。
+本次执行结果见 [场景验收记录](validation-scenarios.md)。

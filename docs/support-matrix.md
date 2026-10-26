@@ -5,7 +5,8 @@
 | Linux amd64 | Go test binaries, five real fio operations, managed CLI, Agent session recovery over SSH on Linux 5.10 | Other kernels/architectures automatically certified |
 | Linux arm64 | Server + Runner images, kind 0.31.0 / Kubernetes 1.35.0, successful/cancelled/restarted/failed Jobs | Production distributed filesystem performance |
 | macOS arm64 | CLI/API development, race tests, embedded UI build/browser | fio performance equivalence with Linux |
-| Tool adapters | fio 3.33; mdtest 4.0.0 single-task single-iteration file-mode imports | Arbitrary tool versions, native metadata execution, MPI/multi-client |
+| Tool adapters | fio 3.33; mdtest 4.0.0 single-task single-iteration file-mode imports | Arbitrary tool versions, MPI/multi-client |
+| Mixed scenarios | sequential/parallel fio; native buffered depth-1 weighted data/stat and single-block file lifecycle; independent counters, histograms, import and comparison | Cross-engine concurrency within one stage, byte-weighted mixes, shared-file races, arbitrary pipelines |
 | Kubernetes storage | Three single-node static hostPath PVs in an isolated functional fixture; results marked RWX | Real RWX multi-node semantics or any CSI-driver certification |
 | Results recovery | Durable bundle, original Job/Attempt identity, permanent claim, cancel observation, retained failed evidence | Exactly-once completion, network partition fencing, automatic retry after data loss |
 | Agent interface | Versioned CLI/API, capabilities, request lookup, durable helper, skill, black-box driver | Third-party LLM reasoning quality or a shipped MCP server |

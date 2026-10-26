@@ -70,3 +70,7 @@ before I/O. Third-party Agent evolution is described in its own design document.
 ## Remaining scope
 
 Production CSI/node-failure and external model acceptance remain environment-specific gates. The server retains a serial queue and SQLite. Supported adapters are intentionally pinned to fio 3.33 and the documented mdtest 4.0.0 single-task file mode. UI history/trend windows are capped at 500 rows; CLI/API history supports pagination.
+
+## Mixed workload scenarios
+
+Added scenario/v1alpha1 planning, sequential/parallel fio, native weighted data/stat, and per-file pipelines. Managed local/Kubernetes execution, portable evidence, baseline/trend grouping, and the scenario UI share the same plan and result contract. Legacy plan hashes remain unchanged. See [usage and boundaries](mixed-workloads.md) and [acceptance evidence](validation-scenarios.md).

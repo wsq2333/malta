@@ -619,7 +619,19 @@ export function App() {
                     <Layers3 size={16} />
                     元数据
                   </button>
-                  <button className={kind === "scenario" ? "selected" : ""} onClick={()=>{setKind("scenario");setOperation("");setFileSize("");setBlockSize("");setSelected(null);}}><Layers3 size={16}/>混合场景</button>
+                  <button
+                    className={kind === "scenario" ? "selected" : ""}
+                    onClick={() => {
+                      setKind("scenario");
+                      setOperation("");
+                      setFileSize("");
+                      setBlockSize("");
+                      setSelected(null);
+                    }}
+                  >
+                    <Layers3 size={16} />
+                    混合场景
+                  </button>
                 </div>
                 <span className="muted">
                   {visible.length} 次实验 · 最多加载 500 条
@@ -711,7 +723,12 @@ export function App() {
                             <th>文件 / I/O 块</th>
                             <th>最高已测吞吐</th>
                           </>
-                        ) : kind === "scenario" ? (<><th>阶段 / 子负载</th><th>完成情况</th></>) : (
+                        ) : kind === "scenario" ? (
+                          <>
+                            <th>阶段 / 子负载</th>
+                            <th>完成情况</th>
+                          </>
+                        ) : (
                           <>
                             <th>对象 / 工具</th>
                             <th>Create / Stat / Remove</th>
@@ -782,7 +799,31 @@ export function App() {
                                   </span>
                                 </td>
                               </>
-                            ) : kind === "scenario" ? (<><td><strong>{r.plan.spec.scenario?.stages.length} 个阶段</strong><span>{r.plan.spec.scenario?.stages.map(s=>s.mode).join(" → ")}</span></td><td><strong>{r.trials.filter(t=>t.status==="succeeded").length} / {r.plan.trials.length} 子负载实验</strong><span>展开查看分组指标与测量时间线</span></td></>) : (
+                            ) : kind === "scenario" ? (
+                              <>
+                                <td>
+                                  <strong>
+                                    {r.plan.spec.scenario?.stages.length} 个阶段
+                                  </strong>
+                                  <span>
+                                    {r.plan.spec.scenario?.stages
+                                      .map((s) => s.mode)
+                                      .join(" → ")}
+                                  </span>
+                                </td>
+                                <td>
+                                  <strong>
+                                    {
+                                      r.trials.filter(
+                                        (t) => t.status === "succeeded",
+                                      ).length
+                                    }{" "}
+                                    / {r.plan.trials.length} 子负载实验
+                                  </strong>
+                                  <span>展开查看分组指标与测量时间线</span>
+                                </td>
+                              </>
+                            ) : (
                               <>
                                 <td>
                                   <strong>
@@ -853,7 +894,9 @@ export function App() {
                 <Leaf size={14} />
                 {kind === "data"
                   ? "最高值仅代表已测矩阵中的重复中位数峰值，不代表系统绝对极限。"
-                  : "元数据当前支持 mdtest 4.0.0 的文件 create、stat、remove；未采集指标保留为空。"}
+                  : kind === "scenario"
+                    ? "混合场景按子负载分别统计；展开查看实际配比、测量时间线与独立指标。"
+                    : "元数据当前支持 mdtest 4.0.0 的文件 create、stat、remove；未采集指标保留为空。"}
               </div>
             </section>
           )}
@@ -1060,7 +1103,14 @@ export function App() {
                               <tr key={m.baseline.key}>
                                 <td>
                                   <strong>
-                                    {m.baseline.stage_id && <small>{m.baseline.stage_id} / {m.baseline.workload_id}<br/></small>}{m.baseline.operation} ·{" "}
+                                    {m.baseline.stage_id && (
+                                      <small>
+                                        {m.baseline.stage_id} /{" "}
+                                        {m.baseline.workload_id}
+                                        <br />
+                                      </small>
+                                    )}
+                                    {m.baseline.operation} ·{" "}
                                     {metricLabel[m.baseline.metric]}
                                   </strong>
                                   <span>
@@ -1129,7 +1179,10 @@ export function App() {
                     >
                       {trendKeys.map((s) => (
                         <option key={s.key} value={s.key}>
-                          {s.stage_id ? `${s.stage_id}/${s.workload_id} · ` : ""}{s.operation} · {metricLabel[s.metric]} · {s.numjobs}j
+                          {s.stage_id
+                            ? `${s.stage_id}/${s.workload_id} · `
+                            : ""}
+                          {s.operation} · {metricLabel[s.metric]} · {s.numjobs}j
                           / {s.iodepth}d
                         </option>
                       ))}

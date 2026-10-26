@@ -13,7 +13,8 @@ Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共�
 | 部分 | 当前实现 |
 | --- | --- |
 | 文件 I/O | fio 3.33；顺序读写、随机读写、混合读写；文件大小与块大小独立；jobs/depth 矩阵与重复实验 |
-| 元数据 | mdtest 4.0.0 单任务文件模式结果导入；create、stat、remove 操作速率；未采集延迟不填零 |
+| 元数据 | mdtest 4.0.0 文件模式导入；原生 stat 与 create/write/fsync/stat/read/unlink 生命周期；按引擎区分延迟口径 |
+| 混合场景 | 顺序/并行 fio、按操作数加权的数据与 stat、逐文件流水线；独立指标、实际配比和时间线 |
 | 环境 | 不可变快照；云厂商、区域、实例/物理机型号、client/server 角色、CPU/内存/存储/网络与配置 |
 | 版本 | 文件系统、版本标签、commit、构建或镜像身份；相同 ID 不可覆盖 |
 | CLI 与 API | 计划、前台执行、托管运行、查询/等待/取消/日志、导入导出、登记、基线与比较 |
@@ -81,6 +82,7 @@ api/                        OpenAPI
 schemas/                    生成的 JSON Schema
 benchmarks/data/            smoke 与 lab 负载
 benchmarks/metadata/        元数据导入条件
+benchmarks/scenarios/       多负载、权重混合与生命周期示例
 environments/              环境与版本示例
 config/                    本地配置，仅提交指定示例和说明
   deploy/                  部署与测试集群 kubeconfig
@@ -116,13 +118,13 @@ MALTA_BIN="$PWD/bin/malta" MALTA_TEST_FIO=/path/to/fio \
 - [CLI 与运行说明](docs/cli.md)
 - [架构与语言选型](docs/architecture.md)
 - [测试方法与可比性](docs/benchmark-methodology.md)
-- [多负载场景定义草案](docs/mixed-workloads.md)（顺序、并行、权重与流水线，尚未实现）
+- [多负载场景](docs/mixed-workloads.md)（顺序、并行、权重与流水线）
 - [S0–S7 路线图](docs/roadmap-v0.1.md)
 - [实现与验证记录](docs/implementation.md)
 - [Agent 测试 skill](skills/malta-benchmark/SKILL.md)
 - [Kubernetes 部署预留](deploy/kubernetes/README.md)
 
-后续优先级：[第三方 Agent 扩展](docs/third-party-agents.md)中的只读分析、服务端权限/预算、MCP 接口与观测关联。当前 UI 历史与趋势窗口最多 500 条；CLI/API 支持历史分页。元数据原生执行、多客户端协调、自动瓶颈归因、对象存储与多租户仍在后续范围。
+后续优先级：[第三方 Agent 扩展](docs/third-party-agents.md)中的只读分析、服务端权限/预算、MCP 接口与观测关联。当前 UI 历史与趋势窗口最多 500 条；CLI/API 支持历史分页。更多元数据操作、多客户端协调、自动瓶颈归因、对象存储与多租户仍在后续范围。
 
 ## RC 安装与发布
 

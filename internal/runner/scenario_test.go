@@ -76,3 +76,42 @@ func TestScenarioPreparationFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestRealCompositeScenario(t *testing.T) {
+	fioBin := os.Getenv("MALTA_TEST_FIO")
+	nativeBin := os.Getenv("MALTA_TEST_BIN")
+	if fioBin == "" || nativeBin == "" {
+		t.Skip("requires fio and Malta binary")
+	}
+	p := scene(t, "parallel")
+	sc := *p.Spec.Scenario
+	var weighted domain.ScenarioSpec
+	if e := domain.Read("../../benchmarks/scenarios/weighted-data.yaml", &weighted); e != nil {
+		t.Fatal(e)
+	}
+	stage := weighted.Stages[0]
+	stage.ID = "weighted-phase"
+	stage.RuntimeSeconds = 2
+	stage.WarmupSeconds = 1
+	sc.Stages = append(sc.Stages, stage)
+	sc.Repeats = 2
+	p, e := domain.NewScenarioPlan(sc, p.Environment, p.Version, p.Target, p.ResourceGroup)
+	if e != nil {
+		t.Fatal(e)
+	}
+	out := filepath.Join(t.TempDir(), "out")
+	r, e := Execute(context.Background(), domain.NewRun(p, "ci"), out, Options{Fio: fioBin, Native: nativeBin, Timeout: 45 * time.Second})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(r.Trials) != 8 || r.ToolVersion != "fio-3.33+malta-native-1" {
+		t.Fatal("composite results missing", r.ToolVersion)
+	}
+	b, e := artifact.Read(out)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = store.VerifyEvidence(b); e != nil {
+		t.Fatal(e)
+	}
+}

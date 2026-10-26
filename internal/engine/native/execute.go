@@ -220,6 +220,9 @@ func Execute(ctx context.Context, q Request) error {
 	}
 	start := time.Now().UTC().Add(time.Duration(stage.WarmupSeconds) * time.Second)
 	end := start.Add(time.Duration(stage.RuntimeSeconds) * time.Second)
+	if err := domain.Write(filepath.Join(q.OutDir, fmt.Sprintf("native-r%d-%s-window.json", q.Repeat, stage.ID)), map[string]time.Time{"start": start, "end": end}); err != nil {
+		return err
+	}
 	active, cancel := context.WithDeadline(ctx, end)
 	defer cancel()
 	queues := make([]chan struct{}, count)

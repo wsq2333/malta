@@ -40,9 +40,27 @@ export interface Workload {
   warmup_seconds: number;
   seed: number;
 }
-export interface ScenarioWorkload { steps?: string[]; id: string; kind: string; numjobs: number; iodepth: number; workload: Workload; }
-export interface ScenarioStage { mix?: {basis: string; weights: Record<string,number>; seed: number}; id: string; mode: string; warmup_seconds: number; runtime_seconds: number; workloads: ScenarioWorkload[]; }
-export interface Scenario { name: string; stages: ScenarioStage[]; repeats: number; }
+export interface ScenarioWorkload {
+  steps?: string[];
+  id: string;
+  kind: string;
+  numjobs: number;
+  iodepth: number;
+  workload: Workload;
+}
+export interface ScenarioStage {
+  mix?: { basis: string; weights: Record<string, number>; seed: number };
+  id: string;
+  mode: string;
+  warmup_seconds: number;
+  runtime_seconds: number;
+  workloads: ScenarioWorkload[];
+}
+export interface Scenario {
+  name: string;
+  stages: ScenarioStage[];
+  repeats: number;
+}
 export interface Spec {
   scenario?: Scenario;
   schema_version: string;
@@ -61,8 +79,20 @@ export interface Metric {
   source: string;
 }
 export interface Trial {
-  point: { id: string; numjobs: number; iodepth: number; repeat: number; stage_id?: string; workload_id?: string };
-  activity?: { submitted: number; succeeded: number; errors: number; late: number };
+  point: {
+    id: string;
+    numjobs: number;
+    iodepth: number;
+    repeat: number;
+    stage_id?: string;
+    workload_id?: string;
+  };
+  activity?: {
+    submitted: number;
+    succeeded: number;
+    errors: number;
+    late: number;
+  };
   started_at?: string;
   finished_at?: string;
   status: string;
@@ -195,7 +225,9 @@ export function summarize(r: Run): Summary[] {
   for (const t of r.trials) {
     if (t.status !== "succeeded") continue;
     for (const m of t.metrics) {
-      const prefix = t.point.stage_id ? `${t.point.stage_id}/${t.point.workload_id}/` : "";
+      const prefix = t.point.stage_id
+        ? `${t.point.stage_id}/${t.point.workload_id}/`
+        : "";
       const key = `${prefix}n${t.point.numjobs}-d${t.point.iodepth}/${m.operation}/${m.name}`;
       let g = groups.get(key);
       if (!g) {
