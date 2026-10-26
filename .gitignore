@@ -1,0 +1,13 @@
+bin/
+.malta/
+results/
+/plan.json
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store
+coverage.out

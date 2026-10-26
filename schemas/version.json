@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/version.json",
+  "$ref": "#/$defs/SoftwareVersion",
+  "$defs": {
+    "SoftwareVersion": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "filesystem": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "build": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "filesystem",
+        "label",
+        "commit",
+        "build"
+      ]
+    }
+  }
+}

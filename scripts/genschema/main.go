@@ -1,0 +1,19 @@
+package main
+
+import (
+	"fmt"
+	"github.com/invopop/jsonschema"
+	"github.com/wsq2333/malta/internal/domain"
+)
+
+func main() {
+	for name, v := range map[string]any{"spec": domain.Spec{}, "environment": domain.Environment{}, "version": domain.SoftwareVersion{}, "plan": domain.Plan{}, "run": domain.Run{}} {
+		r := new(jsonschema.Reflector)
+		s := r.Reflect(v)
+		s.ID = jsonschema.ID("https://malta.local/schemas/" + name + ".json")
+		if err := domain.Write("schemas/"+name+".json", s); err != nil {
+			panic(err)
+		}
+		fmt.Println(name)
+	}
+}

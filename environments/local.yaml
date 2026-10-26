@@ -1,0 +1,17 @@
+schema_version: '1.0'
+id: local-dev-r1
+name: Dedicated local development directory
+kind: local
+provider: ''
+region: ''
+machines:
+  - role: client
+    model: unknown
+    count: 1
+    cpu: unknown
+    memory_bytes: 0
+    storage: unknown
+    network: unknown
+os: unknown
+config:
+  purpose: functional-smoke-only
