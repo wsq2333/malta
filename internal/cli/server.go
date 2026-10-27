@@ -117,7 +117,7 @@ func serverCommands(root *cobra.Command, o *Options) {
 		if e != nil {
 			return e
 		}
-		server := &http.Server{Handler: api.Handler(m, o.Token, frontendHandler()), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+		server := &http.Server{Handler: api.Handler(m, o.Token, frontendHandler(), api.Options{AllowUnauthenticated: allowUnauthenticated}), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		done := make(chan error, 1)
