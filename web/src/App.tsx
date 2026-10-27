@@ -129,6 +129,7 @@ export function App() {
     [requestId, setRequestId] = useState(""),
     [executor, setExecutor] = useState("local"),
     [executors, setExecutors] = useState<string[]>([]),
+    [managementOnly, setManagementOnly] = useState(false),
     [baselineName, setBaselineName] = useState(""),
     [modalError, setModalError] = useState(""),
     [logs, setLogs] = useState<unknown>(null);
@@ -183,7 +184,9 @@ export function App() {
       api<Environment[]>("/environments"),
       api<Version[]>("/versions"),
       api<Baseline[]>("/baselines"),
-      api<{ executors: string[] }>("/capabilities"),
+      api<{ executors: string[]; features: { management_only?: boolean } }>(
+        "/capabilities",
+      ),
     ])
       .then(([r, e, v, b, caps]) => {
         if (valid) {
@@ -192,6 +195,7 @@ export function App() {
           setVersions(v);
           setBaselines(b);
           setExecutors(caps.executors);
+          setManagementOnly(caps.features.management_only === true);
           setExecutor((old) =>
             caps.executors.includes(old) ? old : caps.executors[0] || "",
           );
@@ -299,6 +303,10 @@ export function App() {
     }
   };
   function openModal(name: string) {
+    if (name === "start" && !executors.length) {
+      setToast("当前服务未启用测试执行，可先管理用例与结果。");
+      return;
+    }
     setModalError("");
     setJSONInput("");
     setRequestId("");
@@ -454,7 +462,11 @@ export function App() {
             <span className="connection-dot" />
             <span>
               可用执行器
-              <small>{executors.join(" / ") || "读取中"} · 串行队列</small>
+              <small>
+                {managementOnly
+                  ? "仅管理服务 · 测试未启用"
+                  : executors.join(" / ") || "读取中"}
+              </small>
             </span>
             <Settings2 size={16} />
           </button>
@@ -515,6 +527,10 @@ export function App() {
             </div>
             <button
               className="primary"
+              disabled={
+                !executors.length &&
+                !["guide", "cases", "versions", "environments"].includes(page)
+              }
               onClick={() =>
                 page === "guide"
                   ? setPage("cases")
@@ -541,6 +557,11 @@ export function App() {
                       : "发起测试"}
             </button>
           </header>
+          {managementOnly && (
+            <div className="alert">
+              当前为仅管理服务：可管理用例、版本、环境与已有结果；测试执行尚未启用。
+            </div>
+          )}
           {error && page !== "guide" && (
             <div className="alert error" role="alert">
               {error}
@@ -637,6 +658,7 @@ export function App() {
               tick={tick}
               createSignal={caseCreate}
               runs={runs}
+              canStart={executors.length > 0}
               onStart={(v) => {
                 openModal("start");
                 setStartMode("case");
