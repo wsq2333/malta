@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Activity,
+  BookOpen,
   ArrowDownToLine,
   ArrowRight,
   Check,
@@ -20,6 +21,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { Guide } from "./Guide";
 import { Chart } from "./LazyChart";
 import { Cases, CasePicker, type CaseVersion } from "./Cases";
 import {
@@ -53,7 +55,13 @@ import {
 } from "./model";
 
 type Page =
-  "cases" | "baselines" | "runs" | "versions" | "environments" | "trends";
+  | "guide"
+  | "cases"
+  | "baselines"
+  | "runs"
+  | "versions"
+  | "environments"
+  | "trends";
 const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
   [
     {
@@ -82,6 +90,7 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
       en: "Compare & trends",
       icon: TrendingUp,
     },
+    { id: "guide", label: "使用指南", en: "User guide", icon: BookOpen },
   ];
 export function App() {
   const initial = new URLSearchParams(location.search);
@@ -485,55 +494,62 @@ export function App() {
                 {currentPage.label}
                 <span className="live-tag">
                   <i />
-                  真实实验数据
+                  {page === "guide" ? "入门与示例" : "真实实验数据"}
                 </span>
               </h1>
               <p>
-                {page === "cases"
-                  ? "保存测试定义，以不可变版本组织每一次实验。"
-                  : page === "baselines"
-                    ? "让每一次性能变化，都有可靠的参照。"
-                    : page === "runs"
-                      ? "管理测试生命周期，追溯每一份原始证据。"
-                      : page === "versions"
-                        ? "以不可变的版本身份，串联每一次测试。"
-                        : page === "environments"
-                          ? "记录云实例与物理硬件，固定公平对照的条件。"
-                          : "在相同测试条件下，观察版本与时间带来的变化。"}
+                {page === "guide"
+                  ? "从填写 JSON 到发起测试，逐步建立可靠的性能对照。"
+                  : page === "cases"
+                    ? "保存测试定义，以不可变版本组织每一次实验。"
+                    : page === "baselines"
+                      ? "让每一次性能变化，都有可靠的参照。"
+                      : page === "runs"
+                        ? "管理测试生命周期，追溯每一份原始证据。"
+                        : page === "versions"
+                          ? "以不可变的版本身份，串联每一次测试。"
+                          : page === "environments"
+                            ? "记录云实例与物理硬件，固定公平对照的条件。"
+                            : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
             <button
               className="primary"
               onClick={() =>
-                page === "cases"
-                  ? setCaseCreate((n) => n + 1)
-                  : openModal(
-                      page === "versions"
-                        ? "version"
-                        : page === "environments"
-                          ? "environment"
-                          : "start",
-                    )
+                page === "guide"
+                  ? setPage("cases")
+                  : page === "cases"
+                    ? setCaseCreate((n) => n + 1)
+                    : openModal(
+                        page === "versions"
+                          ? "version"
+                          : page === "environments"
+                            ? "environment"
+                            : "start",
+                      )
               }
             >
               <Plus size={17} />
-              {page === "cases"
-                ? "新建用例"
-                : page === "versions"
-                  ? "登记版本"
-                  : page === "environments"
-                    ? "登记环境"
-                    : "发起测试"}
+              {page === "guide"
+                ? "前往用例管理"
+                : page === "cases"
+                  ? "新建用例"
+                  : page === "versions"
+                    ? "登记版本"
+                    : page === "environments"
+                      ? "登记环境"
+                      : "发起测试"}
             </button>
           </header>
-          {error && (
+          {error && page !== "guide" && (
             <div className="alert error" role="alert">
               {error}
               <button onClick={() => openModal("token")}>连接设置</button>
               <button onClick={refresh}>重试</button>
             </div>
           )}
-          {page !== "cases" && (
+          {page === "guide" && <Guide onNavigate={setPage} />}
+          {page !== "cases" && page !== "guide" && (
             <>
               <section className="stats">
                 <Stat

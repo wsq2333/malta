@@ -1389,3 +1389,255 @@ summary {
   border-radius: 10px;
   background: #f6fcf8;
 }
+
+/* Inline documentation keeps examples readable without leaving the workspace. */
+.guide {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.guide-intro {
+  padding: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: linear-gradient(120deg, #fff 35%, #edf9f2);
+}
+.guide-intro > div {
+  max-width: 700px;
+}
+.guide-intro > svg {
+  flex-shrink: 0;
+  color: #51a483;
+}
+.guide-intro h2 {
+  margin: 10px 0;
+  font-size: 24px;
+  line-height: 1.5;
+}
+.guide-intro p {
+  color: #647c6e;
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+.guide-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.guide-toc a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f6faf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.guide-toc a:hover {
+  background: #eaf7ee;
+  color: #12745a;
+}
+.guide-toc span {
+  color: #8caa97;
+  font-family: ui-monospace, monospace;
+}
+.guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.guide-steps > div {
+  padding: 22px;
+}
+.guide-steps svg {
+  color: var(--green);
+  margin-right: 12px;
+  vertical-align: middle;
+}
+.guide-steps h3 {
+  margin: 14px 0 8px;
+}
+.guide-steps p {
+  color: #718078;
+  line-height: 1.7;
+  font-size: 13px;
+}
+.guide-section {
+  padding: 26px;
+  min-width: 0;
+  scroll-margin-top: 25px;
+}
+.guide-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.guide-section-heading > span {
+  color: #12835e;
+  background: #eaf7ef;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font:
+    13px ui-monospace,
+    monospace;
+}
+.guide-section p,
+.guide-section li {
+  line-height: 1.9;
+  color: #526a5c;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.guide-section p {
+  margin: 12px 0;
+}
+.guide-section h3 {
+  margin: 24px 0 12px;
+}
+.guide-section ol {
+  padding-left: 22px;
+}
+.guide-section li {
+  padding-left: 5px;
+  margin-bottom: 12px;
+}
+.guide-section code {
+  font:
+    12px ui-monospace,
+    monospace;
+  background: #f0f6f2;
+  padding: 2px 4px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.guide-section td {
+  white-space: normal;
+  vertical-align: top;
+  line-height: 1.8;
+}
+.guide-section td:first-child {
+  width: 29%;
+  min-width: 175px;
+}
+.guide-section table {
+  min-width: 560px;
+}
+.guide-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f1faf5;
+  border: 1px solid #dceee2;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 18px 0;
+}
+.guide-note svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+  color: var(--green);
+}
+.guide-note p {
+  margin: 0;
+}
+.guide-code {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 18px 0;
+}
+.guide-code-header {
+  background: #f4f9f6;
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.guide-code-header > div {
+  display: flex;
+  gap: 8px;
+}
+.guide-code pre {
+  margin: 0;
+  padding: 18px;
+  max-height: 400px;
+  overflow: auto;
+  background: #fcfefc;
+  font-size: 12px;
+  line-height: 1.75;
+  tab-size: 2;
+}
+.guide-code pre code {
+  background: none;
+  padding: 0;
+}
+.guide-copy-status {
+  display: block;
+  padding: 0 16px;
+  font-size: 12px;
+  color: var(--green);
+}
+.guide-copy-status:not(:empty) {
+  padding: 10px 16px;
+}
+.guide-example-tabs {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.guide-section details {
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+}
+.guide-section summary {
+  cursor: pointer;
+  color: #274c38;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .guide-intro,
+  .guide-section {
+    padding: 20px;
+  }
+  .guide-intro > svg {
+    display: none;
+  }
+  .guide-intro h2 {
+    font-size: 20px;
+  }
+  .guide-steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .guide-toc a {
+    padding: 9px 10px;
+  }
+}
+
+.guide-example-tabs button {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  line-height: 1.6;
+  text-align: left;
+}
+.guide-example-tabs button.selected {
+  border-color: #b6dfc8;
+  background: #edf8f1;
+}
+.guide-example-tabs button.selected:after {
+  display: none;
+}
+.guide-section,
+.guide-intro {
+  scroll-margin-top: 90px;
+}
