@@ -1,0 +1,34 @@
+schema_version: scenario/v1alpha1
+name: file-lifecycle
+repeats: 3
+failure_policy: stop_all
+stages:
+- id: lifecycle
+  mode: pipeline
+  warmup_seconds: 1
+  runtime_seconds: 5
+  dataset_policy: isolated_per_workload
+  workloads:
+  - id: file-lifecycle
+    kind: pipeline
+    numjobs: 1
+    iodepth: 1
+    workload:
+      operation: lifecycle
+      file_size_bytes: 4096
+      files_per_job: 1
+      block_size_bytes: 4096
+      read_percent: 100
+      ioengine: psync
+      direct: false
+      cache_state: warm
+      fsync_every: 0
+      seed: 42
+    engine: native
+    steps:
+    - create
+    - write
+    - fsync
+    - stat
+    - read
+    - unlink

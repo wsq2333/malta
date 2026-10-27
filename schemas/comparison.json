@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/comparison.json",
+  "$ref": "#/$defs/Comparison",
+  "$defs": {
+    "Comparison": {
+      "properties": {
+        "baseline": {
+          "type": "string"
+        },
+        "candidate": {
+          "type": "string"
+        },
+        "comparable": {
+          "type": "boolean"
+        },
+        "differences": {
+          "items": {
+            "$ref": "#/$defs/Difference"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/Delta"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "baseline",
+        "candidate",
+        "comparable",
+        "differences",
+        "warnings",
+        "metrics"
+      ]
+    },
+    "Delta": {
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/Summary"
+        },
+        "candidate": {
+          "$ref": "#/$defs/Summary"
+        },
+        "percent": {
+          "type": "number"
+        },
+        "direction": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "baseline",
+        "candidate",
+        "percent",
+        "direction"
+      ]
+    },
+    "Difference": {
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "field",
+        "reason"
+      ]
+    },
+    "Summary": {
+      "properties": {
+        "stage_id": {
+          "type": "string"
+        },
+        "workload_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "numjobs": {
+          "type": "integer"
+        },
+        "iodepth": {
+          "type": "integer"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "median": {
+          "type": "number"
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "key",
+        "numjobs",
+        "iodepth",
+        "operation",
+        "metric",
+        "unit",
+        "count",
+        "median",
+        "min",
+        "max"
+      ]
+    }
+  }
+}

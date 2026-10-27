@@ -1,0 +1,20 @@
+schema_version: '1.0'
+name: smoke-sequential-read
+kind: data
+workload:
+  operation: read
+  file_size_bytes: 8388608
+  files_per_job: 1
+  block_size_bytes: 4096
+  read_percent: 100
+  ioengine: psync
+  direct: false
+  cache_state: warm
+  fsync_every: 0
+  runtime_seconds: 1
+  warmup_seconds: 0
+  seed: 42
+matrix:
+  numjobs: [1]
+  iodepth: [1]
+repeats: 3

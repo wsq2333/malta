@@ -1,0 +1,13 @@
+{
+  "context": "",
+  "namespace": "malta",
+  "cluster": "lab-cluster",
+  "node": "benchmark-node",
+  "benchmark_pvc": "benchmark-data",
+  "results_pvc": "malta-results",
+  "results_dir": "/results",
+  "image": "example.invalid/malta-runner@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "service_account": "malta-runner",
+  "cpu_millis": 1000,
+  "memory_bytes": 536870912
+}

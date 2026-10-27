@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/environment.json",
+  "$ref": "#/$defs/Environment",
+  "$defs": {
+    "Environment": {
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "enum": [
+            "1.0"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "machines": {
+          "items": {
+            "$ref": "#/$defs/Machine"
+          },
+          "type": "array"
+        },
+        "os": {
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "name",
+        "kind",
+        "provider",
+        "region",
+        "machines",
+        "os",
+        "config"
+      ]
+    },
+    "Machine": {
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "cpu": {
+          "type": "string"
+        },
+        "memory_bytes": {
+          "type": "integer"
+        },
+        "storage": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "role",
+        "model",
+        "count",
+        "cpu",
+        "memory_bytes",
+        "storage",
+        "network"
+      ]
+    }
+  }
+}

@@ -1,0 +1,737 @@
+openapi: 3.1.0
+info:
+  title: Malta API
+  version: 0.1.0
+  description: Single-instance run management and evidence-based benchmark comparison.
+    Local and Kubernetes executors share a serial queue. Bearer authentication is required when
+    a server token is configured. Logs are bounded
+    snapshots.
+servers:
+- url: /api/v1
+security:
+- bearerAuth: []
+paths:
+  /cases:
+    get:
+      responses:
+        '200':
+          description: Cases with latest immutable version, newest update first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: array
+                    items: {$ref: '../schemas/case.json'}
+    post:
+      description: Create v1; base_revision must be zero. Rebuild trials and hash. Maximum request 4 MiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/save-case.json'}
+      responses:
+        '201':
+          description: Immutable case version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseVersionEnvelope'}
+        '400': {description: Invalid input}
+  /cases/{id}/versions:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema: {type: string}
+    get:
+      responses:
+        '200':
+          description: All immutable versions in descending revision order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: array
+                    items: {$ref: '../schemas/case-version.json'}
+        '404': {description: Case not found}
+    post:
+      description: Append a revision if base_revision equals the latest revision; old snapshots never change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/save-case.json'}
+      responses:
+        '201':
+          description: New immutable case version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseVersionEnvelope'}
+        '400': {description: Invalid input}
+        '404': {description: Case not found}
+        '409': {description: Latest revision changed; reload before saving}
+  /cases/{id}/versions/{revision}:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema: {type: string}
+    - in: path
+      name: revision
+      required: true
+      schema: {type: integer, minimum: 1}
+    get:
+      responses:
+        '200':
+          description: A fixed case version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseVersionEnvelope'}
+        '404': {description: Case or revision not found}
+  /capabilities:
+    get:
+      responses:
+        '200':
+          description: Version, schema, configured executors and enforced server budgets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data: {$ref: '../schemas/capabilities.json'}
+  /requests/{id}:
+    get:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Existing run for this request ID; never starts a run
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data: {$ref: '../schemas/run.json'}
+        '404':
+          description: No matching request
+  /health:
+    get:
+      security: []
+      responses:
+        '200':
+          description: Server health and version
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /environments:
+    get:
+      responses:
+        '200':
+          description: Environment snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/environment.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/environment.json
+      responses:
+        '201':
+          description: Registered immutable snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/environment.json
+        '409':
+          description: Identifier already has different content
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /versions:
+    get:
+      responses:
+        '200':
+          description: Registered filesystem versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/version.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/version.json
+      responses:
+        '201':
+          description: Registered version
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/version.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /runs:
+    get:
+      parameters:
+      - name: environment
+        in: query
+        schema:
+          type: string
+      - name: version
+        in: query
+        schema:
+          type: string
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum:
+          - data
+          - metadata
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      responses:
+        '200':
+          description: Runs ordered by creation time descending
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/run.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - request_id
+              - source
+              - executor
+              oneOf:
+              - required: [plan]
+                not: {required: [case_ref]}
+              - required: [case_ref]
+                not: {required: [plan]}
+              properties:
+                case_ref:
+                  type: object
+                  additionalProperties: false
+                  required: [id, revision]
+                  properties:
+                    id: {type: string}
+                    revision: {type: integer, minimum: 1}
+                plan:
+                  $ref: ../schemas/plan.json
+                request_id:
+                  type: string
+                source:
+                  type: string
+                  enum:
+                  - human
+                  - agent
+                  - ci
+                executor:
+                  type: string
+                  enum:
+                  - local
+                  - kubernetes
+      responses:
+        '202':
+          description: Submitted or existing logical Run
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        '409':
+          description: Request identifier conflict
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /runs/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Run including plan, attempt and trials
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /runs/{id}/cancel:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    post:
+      responses:
+        '200':
+          description: Current state after cancellation request; poll for terminal
+            state
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /runs/{id}/logs:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Bounded log snapshot with truncation indicator
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /runs/{id}/bundle:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Portable bundle with base64 files and SHA-256 hashes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/bundle.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /runs/{id}/artifacts/{path}:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    - name: path
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Registered relative artifact path
+    get:
+      responses:
+        '200':
+          description: Verified original artifact bytes
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /imports:
+    post:
+      description: Import a verified portable bundle, at most 32 MiB decoded artifacts
+        and 64 MiB HTTP body.
+      responses:
+        '201':
+          description: Imported or identical existing run
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/run.json
+        '409':
+          description: Run identifier has different content
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/bundle.json
+  /baselines:
+    get:
+      responses:
+        '200':
+          description: Immutable baseline versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/baseline.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - name
+              - run_id
+              properties:
+                name:
+                  type: string
+                run_id:
+                  type: string
+      responses:
+        '201':
+          description: New baseline version referencing a complete run
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/baseline.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /comparisons:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - baseline
+              - candidate
+              properties:
+                baseline:
+                  type: string
+                  description: Baseline run identifier
+                candidate:
+                  type: string
+                  description: Candidate run identifier
+      responses:
+        '200':
+          description: Comparability reasons and per-point median/min/max differences;
+            null percentage when baseline is zero
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/comparison.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /trends:
+    get:
+      parameters:
+      - name: run_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: Anchor run defining environment and workload
+      responses:
+        '200':
+          description: Same-environment
+          same-workload: null
+          same-tool successful history: null
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /environments/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Immutable registered identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/environment.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /versions/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RunID'
+    get:
+      responses:
+        '200':
+          description: Immutable registered identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - schema_version
+                - data
+                properties:
+                  schema_version:
+                    const: '1.0'
+                  data:
+                    $ref: ../schemas/version.json
+        default:
+          description: Structured error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    RunID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CaseVersionEnvelope:
+      type: object
+      required: [schema_version, data]
+      properties:
+        schema_version: {const: '1.0'}
+        data: {$ref: '../schemas/case-version.json'}
+    ErrorEnvelope:
+      type: object
+      required:
+      - schema_version
+      - error
+      properties:
+        schema_version:
+          const: '1.0'
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              enum:
+              - invalid
+              - unsupported
+              - conflict
+              - not_found
+              - unauthorized
+              - timeout
+              - cancelled
+              - internal
+            message:
+              type: string

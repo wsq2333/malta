@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/capabilities.json",
+  "$ref": "#/$defs/Capabilities",
+  "$defs": {
+    "Capabilities": {
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "executors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fio_version": {
+          "type": "string"
+        },
+        "metadata_import": {
+          "type": "string"
+        },
+        "features": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "type": "object"
+        },
+        "limits": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schema_version",
+        "version",
+        "mode",
+        "executors",
+        "fio_version",
+        "metadata_import",
+        "features",
+        "limits"
+      ]
+    }
+  }
+}

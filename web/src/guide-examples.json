@@ -1,0 +1,307 @@
+{
+  "data": {
+    "schema_version": "1.0",
+    "spec": {
+      "schema_version": "1.0",
+      "name": "smoke-sequential-read",
+      "kind": "data",
+      "workload": {
+        "operation": "read",
+        "file_size_bytes": 8388608,
+        "files_per_job": 1,
+        "block_size_bytes": 4096,
+        "read_percent": 100,
+        "ioengine": "psync",
+        "direct": false,
+        "cache_state": "warm",
+        "fsync_every": 0,
+        "runtime_seconds": 1,
+        "warmup_seconds": 0,
+        "seed": 42
+      },
+      "matrix": {
+        "numjobs": [1],
+        "iodepth": [1]
+      },
+      "repeats": 3
+    },
+    "environment": {
+      "schema_version": "1.0",
+      "id": "local-dev-r1",
+      "name": "Dedicated local development directory",
+      "kind": "local",
+      "provider": "",
+      "region": "",
+      "machines": [
+        {
+          "role": "client",
+          "model": "unknown",
+          "count": 1,
+          "cpu": "unknown",
+          "memory_bytes": 0,
+          "storage": "unknown",
+          "network": "unknown"
+        }
+      ],
+      "os": "unknown",
+      "config": {
+        "purpose": "functional-smoke-only"
+      }
+    },
+    "version": {
+      "schema_version": "1.0",
+      "id": "local-filesystem-v1",
+      "filesystem": "local-filesystem",
+      "label": "local-dev",
+      "commit": "",
+      "build": ""
+    },
+    "target": "/tmp/malta-guide-data",
+    "resource_group": "guide-device",
+    "trials": [
+      {
+        "id": "n1-d1-r1",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 1
+      },
+      {
+        "id": "n1-d1-r2",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 2
+      },
+      {
+        "id": "n1-d1-r3",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 3
+      }
+    ],
+    "hash": "d43fbcdfeb7d91146d8ab2151bbb1b9ca84eb2f4ddd02b6a00a4558be0575ff2"
+  },
+  "mixed": {
+    "schema_version": "scenario/v1alpha1",
+    "spec": {
+      "scenario": {
+        "schema_version": "scenario/v1alpha1",
+        "name": "weighted-data-and-stat",
+        "repeats": 3,
+        "failure_policy": "stop_all",
+        "stages": [
+          {
+            "mix": {
+              "basis": "operations",
+              "weights": {
+                "file-stat": 10,
+                "large-write": 20,
+                "small-read": 70
+              },
+              "seed": 42
+            },
+            "id": "mixed-data",
+            "mode": "weighted",
+            "warmup_seconds": 2,
+            "runtime_seconds": 10,
+            "dataset_policy": "isolated_per_workload",
+            "workloads": [
+              {
+                "engine": "native",
+                "id": "small-read",
+                "kind": "data",
+                "numjobs": 2,
+                "iodepth": 1,
+                "workload": {
+                  "operation": "randread",
+                  "file_size_bytes": 8388608,
+                  "files_per_job": 1,
+                  "block_size_bytes": 4096,
+                  "read_percent": 100,
+                  "ioengine": "psync",
+                  "direct": false,
+                  "cache_state": "warm",
+                  "fsync_every": 0,
+                  "runtime_seconds": 0,
+                  "warmup_seconds": 0,
+                  "seed": 42
+                }
+              },
+              {
+                "engine": "native",
+                "id": "large-write",
+                "kind": "data",
+                "numjobs": 1,
+                "iodepth": 1,
+                "workload": {
+                  "operation": "write",
+                  "file_size_bytes": 33554432,
+                  "files_per_job": 1,
+                  "block_size_bytes": 1048576,
+                  "read_percent": 0,
+                  "ioengine": "psync",
+                  "direct": false,
+                  "cache_state": "warm",
+                  "fsync_every": 0,
+                  "runtime_seconds": 0,
+                  "warmup_seconds": 0,
+                  "seed": 43
+                }
+              },
+              {
+                "engine": "native",
+                "id": "file-stat",
+                "kind": "metadata",
+                "numjobs": 1,
+                "iodepth": 1,
+                "workload": {
+                  "operation": "stat",
+                  "file_size_bytes": 8388608,
+                  "files_per_job": 1,
+                  "block_size_bytes": 4096,
+                  "read_percent": 100,
+                  "ioengine": "psync",
+                  "direct": false,
+                  "cache_state": "warm",
+                  "fsync_every": 0,
+                  "runtime_seconds": 0,
+                  "warmup_seconds": 0,
+                  "seed": 42
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "schema_version": "scenario/v1alpha1",
+      "name": "weighted-data-and-stat",
+      "kind": "scenario",
+      "workload": {
+        "operation": "",
+        "file_size_bytes": 0,
+        "files_per_job": 0,
+        "block_size_bytes": 0,
+        "read_percent": 0,
+        "ioengine": "",
+        "direct": false,
+        "cache_state": "",
+        "fsync_every": 0,
+        "runtime_seconds": 0,
+        "warmup_seconds": 0,
+        "seed": 0
+      },
+      "matrix": {
+        "numjobs": null,
+        "iodepth": null
+      },
+      "repeats": 3
+    },
+    "environment": {
+      "schema_version": "1.0",
+      "id": "local-dev-r1",
+      "name": "Dedicated local development directory",
+      "kind": "local",
+      "provider": "",
+      "region": "",
+      "machines": [
+        {
+          "role": "client",
+          "model": "unknown",
+          "count": 1,
+          "cpu": "unknown",
+          "memory_bytes": 0,
+          "storage": "unknown",
+          "network": "unknown"
+        }
+      ],
+      "os": "unknown",
+      "config": {
+        "purpose": "functional-smoke-only"
+      }
+    },
+    "version": {
+      "schema_version": "1.0",
+      "id": "local-filesystem-v1",
+      "filesystem": "local-filesystem",
+      "label": "local-dev",
+      "commit": "",
+      "build": ""
+    },
+    "target": "/tmp/malta-guide-data",
+    "resource_group": "guide-device",
+    "trials": [
+      {
+        "id": "r1-mixed-data-small-read",
+        "numjobs": 2,
+        "iodepth": 1,
+        "repeat": 1,
+        "stage_id": "mixed-data",
+        "workload_id": "small-read"
+      },
+      {
+        "id": "r1-mixed-data-large-write",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 1,
+        "stage_id": "mixed-data",
+        "workload_id": "large-write"
+      },
+      {
+        "id": "r1-mixed-data-file-stat",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 1,
+        "stage_id": "mixed-data",
+        "workload_id": "file-stat"
+      },
+      {
+        "id": "r2-mixed-data-small-read",
+        "numjobs": 2,
+        "iodepth": 1,
+        "repeat": 2,
+        "stage_id": "mixed-data",
+        "workload_id": "small-read"
+      },
+      {
+        "id": "r2-mixed-data-large-write",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 2,
+        "stage_id": "mixed-data",
+        "workload_id": "large-write"
+      },
+      {
+        "id": "r2-mixed-data-file-stat",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 2,
+        "stage_id": "mixed-data",
+        "workload_id": "file-stat"
+      },
+      {
+        "id": "r3-mixed-data-small-read",
+        "numjobs": 2,
+        "iodepth": 1,
+        "repeat": 3,
+        "stage_id": "mixed-data",
+        "workload_id": "small-read"
+      },
+      {
+        "id": "r3-mixed-data-large-write",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 3,
+        "stage_id": "mixed-data",
+        "workload_id": "large-write"
+      },
+      {
+        "id": "r3-mixed-data-file-stat",
+        "numjobs": 1,
+        "iodepth": 1,
+        "repeat": 3,
+        "stage_id": "mixed-data",
+        "workload_id": "file-stat"
+      }
+    ],
+    "hash": "e765c067545959de061f8cf6654526685454f187dede03f8e1cb2fabc2b65398"
+  }
+}

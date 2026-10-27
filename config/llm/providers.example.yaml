@@ -1,0 +1,14 @@
+# 未来 LLM 接入模板；当前服务不会加载此文件或发起模型请求。
+# base_url、model 和凭证来源需要按供应商填写，格式可随后续实现调整。
+default_provider: example
+providers:
+  example:
+    protocol: openai-compatible
+    base_url: https://llm.example.invalid/v1
+    model: REPLACE_WITH_MODEL_ID
+    # 未来加载器应优先读取此环境变量；目前没有实现变量解析。
+    api_key_env: MALTA_LLM_API_KEY
+    # 如需本地保存密钥，只填写被 Git 忽略的 providers.yaml 副本。
+    # 环境变量和文件二选一，示例不包含任何真实密钥。
+    api_key: ""
+    timeout_seconds: 60

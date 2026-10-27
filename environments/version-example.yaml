@@ -1,0 +1,6 @@
+schema_version: '1.0'
+id: local-filesystem-v1
+filesystem: local-filesystem
+label: local-dev
+commit: ''
+build: ''

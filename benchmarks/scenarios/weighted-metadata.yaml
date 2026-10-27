@@ -1,0 +1,66 @@
+schema_version: scenario/v1alpha1
+name: weighted-data-and-stat
+repeats: 3
+failure_policy: stop_all
+stages:
+- id: mixed-data
+  mode: weighted
+  warmup_seconds: 2
+  runtime_seconds: 10
+  dataset_policy: isolated_per_workload
+  workloads:
+  - id: small-read
+    kind: data
+    numjobs: 2
+    iodepth: 1
+    workload:
+      operation: randread
+      file_size_bytes: 8388608
+      files_per_job: 1
+      block_size_bytes: 4096
+      read_percent: 100
+      ioengine: psync
+      direct: false
+      cache_state: warm
+      fsync_every: 0
+      seed: 42
+    engine: native
+  - id: large-write
+    kind: data
+    numjobs: 1
+    iodepth: 1
+    workload:
+      operation: write
+      file_size_bytes: 33554432
+      files_per_job: 1
+      block_size_bytes: 1048576
+      read_percent: 0
+      ioengine: psync
+      direct: false
+      cache_state: warm
+      fsync_every: 0
+      seed: 43
+    engine: native
+  - id: file-stat
+    kind: metadata
+    numjobs: 1
+    iodepth: 1
+    workload:
+      operation: stat
+      file_size_bytes: 8388608
+      files_per_job: 1
+      block_size_bytes: 4096
+      read_percent: 100
+      ioengine: psync
+      direct: false
+      cache_state: warm
+      fsync_every: 0
+      seed: 42
+    engine: native
+  mix:
+    basis: operations
+    weights:
+      small-read: 70
+      large-write: 20
+      file-stat: 10
+    seed: 42

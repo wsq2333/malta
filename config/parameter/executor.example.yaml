@@ -1,0 +1,17 @@
+# 当前可通过 malta serve --kubernetes-config 指定此格式的本地副本。
+# 主机运行必须显式指定 context；Service Pod 使用集群内身份时设为 ""。
+context: malta-benchmark
+namespace: malta
+# cluster 是记录在环境快照中的身份，应与 environment.config.cluster 一致。
+cluster: lab-cluster
+node: benchmark-node
+benchmark_pvc: benchmark-data
+results_pvc: malta-results
+# 服务端必须在此路径访问同一个结果 PVC。
+results_dir: /results
+# 必须替换为真实构建镜像的 digest；全零值仅为占位符。
+image: example.invalid/malta-runner@sha256:0000000000000000000000000000000000000000000000000000000000000000
+service_account: malta-runner
+cpu_millis: 1000
+memory_bytes: 536870912
+kubectl: kubectl
