@@ -74,3 +74,23 @@ Production CSI/node-failure and external model acceptance remain environment-spe
 ## Mixed workload scenarios
 
 Added scenario/v1alpha1 planning, sequential/parallel fio, native weighted data/stat, and per-file pipelines. Managed local/Kubernetes execution, portable evidence, baseline/trend grouping, and the scenario UI share the same plan and result contract. Legacy plan hashes remain unchanged. See [usage and boundaries](mixed-workloads.md) and [acceptance evidence](validation-scenarios.md).
+
+## Workspace visual refresh — 2026-10-28
+
+The UI now defaults to a charcoal theme inspired by the visual hierarchy of
+[Entire](https://entire.com/about): neutral surfaces, fine borders, larger headings,
+white primary actions and restrained green accents. It keeps Malta's navigation,
+benchmark tables and JSON workflows. No Entire fonts, logos or imagery are bundled.
+The top bar switches between dark and light themes; the preference is stored locally
+under `malta-theme`, with a dark fallback if browser storage is unavailable.
+
+Semantic CSS variables in `web/src/style.css` cover surfaces, text, status and chart
+colors. ECharts reads the same palette and updates when the theme changes. Long case
+descriptions use a three-line list summary; the version view retains the full text.
+
+Validation: TypeScript, the production frontend build and all three existing model
+tests passed on the designated SSH development host. Browser checks used a separate
+local management-only service and a local copy of the registered Curvine case:
+case list/version/editor, guide, light/dark switching and reload persistence.
+At 390 px, the case table scrolls within its container without whole-page overflow.
+This change does not deploy a new image or modify the sample dev cluster.

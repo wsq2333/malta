@@ -154,7 +154,6 @@ export function RunMetrics({ run }: { run: Run }) {
       };
     });
     return {
-      color: ["#169d77", "#65b7bd", "#a3c653", "#829ddb"],
       tooltip: { trigger: "axis" },
       legend: { bottom: 5 },
       grid: { left: 65, right: 25, top: 35, bottom: 65 },
@@ -162,7 +161,6 @@ export function RunMetrics({ run }: { run: Run }) {
       yAxis: {
         type: "value",
         name: "MiB/s",
-        splitLine: { lineStyle: { color: "#edf3ef" } },
       },
       series,
     };

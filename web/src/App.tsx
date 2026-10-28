@@ -14,6 +14,8 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sun,
+  Moon,
   Server,
   Settings2,
   ShieldCheck,
@@ -93,6 +95,17 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
     { id: "guide", label: "使用指南", en: "User guide", icon: BookOpen },
   ];
 export function App() {
+  const [theme, setTheme] = useState(
+    document.documentElement.dataset.theme || "dark",
+  );
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem("malta-theme", theme);
+    } catch {
+      /* Storage can be disabled. */
+    }
+  }, [theme]);
   const initial = new URLSearchParams(location.search);
   const [page, setPage] = useState<Page>(
     pages.find((p) => p.id === initial.get("page"))?.id || "baselines",
@@ -382,7 +395,6 @@ export function App() {
           ? "μs"
           : metric?.unit || "";
     return {
-      color: ["#169d77"],
       tooltip: {
         trigger: "axis",
         valueFormatter: (v: number) => `${Number(v).toFixed(2)} ${unit}`,
@@ -393,13 +405,10 @@ export function App() {
         data: points.map(
           (p) => `${date(p.run.created_at)}\n${p.run.plan.version.label}`,
         ),
-        axisLine: { lineStyle: { color: "#dce7e0" } },
-        axisLabel: { color: "#718078" },
       },
       yAxis: {
         type: "value",
         name: unit,
-        splitLine: { lineStyle: { color: "#edf3ef" } },
       },
       series: [
         {
@@ -413,7 +422,7 @@ export function App() {
             return m ? m.median / scale : null;
           }),
           lineStyle: { width: 3 },
-          areaStyle: { color: "rgba(37,178,130,.08)" },
+          areaStyle: { opacity: 0.08 },
         },
       ],
     };
@@ -488,6 +497,14 @@ export function App() {
               onClick={refresh}
             >
               <RefreshCw size={17} className={loading ? "spin" : ""} />
+            </button>
+            <button
+              className="icon-button theme-toggle"
+              aria-label={theme === "dark" ? "切换浅色主题" : "切换深色主题"}
+              title={theme === "dark" ? "切换浅色主题" : "切换深色主题"}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
             </button>
             <button
               className="avatar"

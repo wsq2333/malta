@@ -26,10 +26,39 @@ export function Chart({
     if (!ref.current) return;
     const chart = init(ref.current);
     chart.setOption(option);
+    const applyTheme = () => {
+      const styles = getComputedStyle(document.documentElement);
+      const color = (name: string) => styles.getPropertyValue(name).trim();
+      const axis = {
+        axisLine: { lineStyle: { color: color("--line") } },
+        axisLabel: { color: color("--text-muted") },
+        nameTextStyle: { color: color("--text-secondary") },
+        splitLine: { lineStyle: { color: color("--line") } },
+      };
+      chart.setOption({
+        color: ["--accent", "--chart-2", "--chart-3", "--chart-4"].map(color),
+        textStyle: { color: color("--text-secondary") },
+        legend: { textStyle: { color: color("--text-secondary") } },
+        tooltip: {
+          backgroundColor: color("--surface-raised"),
+          borderColor: color("--line"),
+          textStyle: { color: color("--text") },
+        },
+        xAxis: axis,
+        yAxis: axis,
+      });
+    };
+    applyTheme();
+    const themeObserver = new MutationObserver(applyTheme);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
     const resize = new ResizeObserver(() => chart.resize());
     resize.observe(ref.current);
     return () => {
       resize.disconnect();
+      themeObserver.disconnect();
       chart.dispose();
     };
   }, [option]);
