@@ -94,3 +94,27 @@ local management-only service and a local copy of the registered Curvine case:
 case list/version/editor, guide, light/dark switching and reload persistence.
 At 390 px, the case table scrolls within its container without whole-page overflow.
 This change does not deploy a new image or modify the sample dev cluster.
+
+
+## Issue tracking (2026-10-28)
+
+Added a shared UI/API/CLI issue register with user-defined type labels, JSON file
+upload, software/hardware descriptions, optional validated registry/run links,
+occurrence/creation/update/resolution timestamps, resolution evidence and immutable
+revision history. Optimistic revision checks prevent stale edits; stable IDs allow
+identical v1 create retries. SQLite v2 upgrades transactionally to v3 while keeping
+existing cases and runs. See [Issue management](issue-management.md).
+
+Validation on the SSH development host: full `go test ./...`, `go vet ./...`,
+frontend tests and production build passed. An isolated real management-only service
+also passed CLI-over-HTTP creation, retry, custom type, resolve, conflict, reopen,
+history and capabilities checks. Initial API test budget and nullable-schema defects
+were reproduced/fixed locally before the successful development-host rerun.
+
+Browser checks used the local preview only: form registration, custom type filtering,
+resolution update, old-version inspection and JSON file upload/save. Fixed the Vite
+proxy to preserve the browser-facing Host for the API's existing same-origin checks;
+normal-origin requests reach validation while cross-origin writes remain rejected.
+Local preview records are explicitly marked as validation examples. No cluster upgrade,
+real issue registration, image push or benchmark execution was performed for this feature.
+The existing ECharts chunk-size warning remains; the production build succeeds.

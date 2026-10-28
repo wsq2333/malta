@@ -11,6 +11,74 @@ servers:
 security:
 - bearerAuth: []
 paths:
+  /issues:
+    get:
+      description: All latest issue revisions, newest update first. Available in management-only mode.
+      responses:
+        '200':
+          description: Issue list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: array
+                    items: {$ref: '../schemas/issue.json'}
+    post:
+      description: >-
+        Create with base_revision=0 or append using the latest revision. Maximum 128 KiB.
+        Type is required free text. Resolved issues require resolution; unresolved issues require an empty resolution.
+        Optional registry/run IDs must exist and agree. Stable-ID identical creation retries are accepted only at revision 1.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '../schemas/save-issue.json'}
+      responses:
+        '201':
+          description: Saved immutable revision
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueEnvelope'}
+        '400': {description: Invalid input or references}
+        '404': {description: Issue to update not found}
+        '409': {description: Revision conflict; reload and merge}
+  /issues/{id}:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema: {type: string}
+    get:
+      responses:
+        '200':
+          description: Latest issue revision
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueEnvelope'}
+        '404': {description: Issue not found}
+  /issues/{id}/history:
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema: {type: string}
+    get:
+      responses:
+        '200':
+          description: Immutable issue revisions, newest revision first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: array
+                    items: {$ref: '../schemas/issue.json'}
+        '404': {description: Issue not found}
   /cases:
     get:
       responses:
@@ -702,6 +770,11 @@ components:
       schema:
         type: string
   schemas:
+    IssueEnvelope:
+      type: object
+      properties:
+        schema_version: {const: '1.0'}
+        data: {$ref: '../schemas/issue.json'}
     CaseVersionEnvelope:
       type: object
       required: [schema_version, data]

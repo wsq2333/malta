@@ -1812,3 +1812,76 @@ td strong {
   overflow: hidden;
   min-width: 240px;
 }
+
+/* Issue tracking shares the workspace theme and responsive table layout. */
+.issue-title {
+  text-align: left;
+  color: var(--text);
+  font-weight: 600;
+  white-space: normal;
+  max-width: 320px;
+}
+.issue-title:hover {
+  text-decoration: underline;
+}
+.issue-summary {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.issue-detail {
+  margin-top: 24px;
+}
+.issue-detail h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.issue-facts {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px 16px;
+}
+.issue-facts dt {
+  color: var(--text-muted);
+}
+.issue-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.issue-facts small {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.issue-json {
+  overflow: auto;
+  max-height: 480px;
+  padding: 16px;
+  background: var(--inset);
+}
+.issue-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.issue-fields details label {
+  margin-top: 12px;
+}
+.issue-fields .issue-resolved {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.issue-resolved input {
+  width: auto;
+}
+
+.issue-title + small {
+  display: block;
+  margin-top: 6px;
+}

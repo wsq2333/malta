@@ -67,6 +67,7 @@ func NewRoot(out, errOut io.Writer) *cobra.Command {
 	executionCommands(r, o)
 	dataCommands(r, o)
 	caseCommands(r, o)
+	issueCommands(r, o)
 	serverCommands(r, o)
 	wrapExecutionErrors(r)
 	return r

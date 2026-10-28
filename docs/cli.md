@@ -96,3 +96,12 @@ Capabilities advertise scenario_plan, scenario_sequential, scenario_parallel, sc
 ## 用例库
 
 `case list/save/history/get` 管理完整计划与不可变版本；`run start --case CASE_ID --case-revision N` 使用固定版本执行，与 `--plan` 互斥。保存格式、冲突处理及 Agent 示例见 [用例管理](case-management.md)。
+
+
+## Issue tracking
+
+`issue save --file FILE` creates with `base_revision=0` or updates using the latest revision.
+`issue list/get/history` reads current issues and immutable history. User-defined `type`
+labels (e.g. 功能, 性能), software/hardware descriptions, optional registered IDs and
+resolution evidence share the same contract for CLI, agents and UI. See
+[Issue management](issue-management.md) for JSON examples, retry semantics and migration.

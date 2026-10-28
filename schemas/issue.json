@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/issue.json",
+  "$ref": "#/$defs/Issue",
+  "$defs": {
+    "Issue": {
+      "properties": {
+        "issue_id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "software": {
+          "type": "string"
+        },
+        "hardware": {
+          "type": "string"
+        },
+        "version_id": {
+          "type": "string"
+        },
+        "environment_id": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "reporter": {
+          "type": "string"
+        },
+        "change_note": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "issue_id",
+        "revision",
+        "title",
+        "type",
+        "description",
+        "software",
+        "hardware",
+        "occurred_at",
+        "resolved",
+        "resolution",
+        "reporter",
+        "change_note",
+        "created_at",
+        "updated_at",
+        "resolved_at"
+      ]
+    }
+  }
+}

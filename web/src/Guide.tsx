@@ -10,6 +10,7 @@ import {
   Play,
 } from "lucide-react";
 import examples from "./guide-examples.json";
+import issueExample from "./issue-example.json";
 
 function CodeExample({
   title,
@@ -148,6 +149,7 @@ export function Guide({
     ["examples", "可复制示例"],
     ["execute", "发起测试"],
     ["compare", "对比结果"],
+    ["issues", "问题跟踪"],
     ["faq", "常见问题"],
   ];
   return (
@@ -465,9 +467,46 @@ malta --server ${origin} run wait RUN_ID --timeout 2m`}
           前往对比与趋势 <ArrowRight size={15} />
         </button>
       </section>
-      <section className="panel guide-section" id="faq">
+      <section className="panel guide-section" id="issues">
         <div className="guide-heading">
           <span>06</span>
+          <h2>登记与跟踪问题</h2>
+        </div>
+        <p>
+          在左侧“问题管理”填写表单或上传 JSON。type
+          是自定义类型，例如“功能”“性能”或“稳定性”；软件和硬件填写可识别的版本与机器描述。
+        </p>
+        <p>
+          创建时 base_revision 为 0，issue_id
+          使用稳定且唯一的标识。关联现有数据可填写 version_id、environment_id 和
+          run_id，这些 ID 必须存在；关联运行时版本与环境必须一致。
+        </p>
+        <p>
+          编辑时使用最新 revision 作为 base_revision，保存后保留旧版本。解决时将
+          resolved 改为 true 并填写 resolution 和验证结果；重新打开时设为
+          false、清空 resolution，并在 change_note
+          中记录原因。历史解决方式仍可查阅。
+        </p>
+        <CodeExample
+          title="问题 JSON 模板（示例，需替换实际信息）"
+          text={JSON.stringify(issueExample, null, 2)}
+          filename="issue.example.json"
+        />
+        <CodeExample
+          title="Agent / CLI 上传与查询"
+          text={
+            "malta --server http://localhost:8080 issue save --file issue.json\nmalta --server http://localhost:8080 issue get issue-example-fio-reopen\nmalta --server http://localhost:8080 issue history issue-example-fio-reopen"
+          }
+        />
+        <p>
+          发现时间使用含时区的
+          RFC3339；创建、更新时间及解决时间由服务记录。导出快照包含只读字段，继续编辑请使用编辑窗口中的“下载提交
+          JSON”。HTTP 409 表示版本冲突，先重新读取并合并，不要强行覆盖。
+        </p>
+      </section>
+      <section className="panel guide-section" id="faq">
+        <div className="guide-heading">
+          <span>07</span>
           <h2>遇到问题时</h2>
         </div>
         {[

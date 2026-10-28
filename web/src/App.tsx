@@ -23,6 +23,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { Issues } from "./Issues";
 import { Guide } from "./Guide";
 import { Chart } from "./LazyChart";
 import { Cases, CasePicker, type CaseVersion } from "./Cases";
@@ -59,6 +60,7 @@ import {
 type Page =
   | "guide"
   | "cases"
+  | "issues"
   | "baselines"
   | "runs"
   | "versions"
@@ -73,6 +75,12 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
       icon: Layers3,
     },
     { id: "runs", label: "测试运行", en: "Benchmark runs", icon: Activity },
+    {
+      id: "issues",
+      label: "问题管理",
+      en: "Issue tracking",
+      icon: ShieldCheck,
+    },
     { id: "cases", label: "用例管理", en: "Benchmark cases", icon: Layers3 },
     {
       id: "versions",
@@ -146,6 +154,7 @@ export function App() {
     [baselineName, setBaselineName] = useState(""),
     [modalError, setModalError] = useState(""),
     [logs, setLogs] = useState<unknown>(null);
+  const [issueCreate, setIssueCreate] = useState(0);
   const [caseCreate, setCaseCreate] = useState(0),
     [chosenCase, setChosenCase] = useState<CaseVersion | null>(null),
     [startMode, setStartMode] = useState("json");
@@ -529,54 +538,66 @@ export function App() {
               <p>
                 {page === "guide"
                   ? "从填写 JSON 到发起测试，逐步建立可靠的性能对照。"
-                  : page === "cases"
-                    ? "保存测试定义，以不可变版本组织每一次实验。"
-                    : page === "baselines"
-                      ? "让每一次性能变化，都有可靠的参照。"
-                      : page === "runs"
-                        ? "管理测试生命周期，追溯每一份原始证据。"
-                        : page === "versions"
-                          ? "以不可变的版本身份，串联每一次测试。"
-                          : page === "environments"
-                            ? "记录云实例与物理硬件，固定公平对照的条件。"
-                            : "在相同测试条件下，观察版本与时间带来的变化。"}
+                  : page === "issues"
+                    ? "记录测试问题、追溯调查过程与解决方式。"
+                    : page === "cases"
+                      ? "保存测试定义，以不可变版本组织每一次实验。"
+                      : page === "baselines"
+                        ? "让每一次性能变化，都有可靠的参照。"
+                        : page === "runs"
+                          ? "管理测试生命周期，追溯每一份原始证据。"
+                          : page === "versions"
+                            ? "以不可变的版本身份，串联每一次测试。"
+                            : page === "environments"
+                              ? "记录云实例与物理硬件，固定公平对照的条件。"
+                              : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
             <button
               className="primary"
               disabled={
                 !executors.length &&
-                !["guide", "cases", "versions", "environments"].includes(page)
+                ![
+                  "guide",
+                  "issues",
+                  "cases",
+                  "versions",
+                  "environments",
+                ].includes(page)
               }
               onClick={() =>
                 page === "guide"
                   ? setPage("cases")
-                  : page === "cases"
-                    ? setCaseCreate((n) => n + 1)
-                    : openModal(
-                        page === "versions"
-                          ? "version"
-                          : page === "environments"
-                            ? "environment"
-                            : "start",
-                      )
+                  : page === "issues"
+                    ? setIssueCreate((n) => n + 1)
+                    : page === "cases"
+                      ? setCaseCreate((n) => n + 1)
+                      : openModal(
+                          page === "versions"
+                            ? "version"
+                            : page === "environments"
+                              ? "environment"
+                              : "start",
+                        )
               }
             >
               <Plus size={17} />
               {page === "guide"
                 ? "前往用例管理"
-                : page === "cases"
-                  ? "新建用例"
-                  : page === "versions"
-                    ? "登记版本"
-                    : page === "environments"
-                      ? "登记环境"
-                      : "发起测试"}
+                : page === "issues"
+                  ? "登记问题"
+                  : page === "cases"
+                    ? "新建用例"
+                    : page === "versions"
+                      ? "登记版本"
+                      : page === "environments"
+                        ? "登记环境"
+                        : "发起测试"}
             </button>
           </header>
           {managementOnly && (
             <div className="alert">
-              当前为仅管理服务：可管理用例、版本、环境与已有结果；测试执行尚未启用。
+              当前为仅管理服务：可管理问题、用例、版本、环境与已有结果；测试执行尚未启用。
             </div>
           )}
           {error && page !== "guide" && (
@@ -587,7 +608,10 @@ export function App() {
             </div>
           )}
           {page === "guide" && <Guide onNavigate={setPage} />}
-          {page !== "cases" && page !== "guide" && (
+          {page === "issues" && (
+            <Issues tick={tick} createSignal={issueCreate} />
+          )}
+          {page !== "issues" && page !== "cases" && page !== "guide" && (
             <>
               <section className="stats">
                 <Stat

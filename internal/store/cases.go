@@ -14,7 +14,7 @@ func (s *Store) migrateCases() error {
 	if e := s.DB.QueryRow("PRAGMA user_version").Scan(&version); e != nil {
 		return e
 	}
-	if version > 2 {
+	if version > 3 {
 		return domain.E("unsupported", "database schema is newer than this Malta binary")
 	}
 	if _, e := s.DB.Exec("PRAGMA foreign_keys=ON"); e != nil {
@@ -27,7 +27,16 @@ func (s *Store) migrateCases() error {
 	defer tx.Rollback()
 	_, e = tx.Exec(`CREATE TABLE IF NOT EXISTS test_cases(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, latest_revision INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS case_versions(case_id TEXT NOT NULL REFERENCES test_cases(id), revision INTEGER NOT NULL CHECK(revision>0), body TEXT NOT NULL, PRIMARY KEY(case_id,revision));
- PRAGMA user_version=2;`)
+ CREATE TABLE IF NOT EXISTS issues(
+ issue_id TEXT PRIMARY KEY,
+ revision INTEGER NOT NULL CHECK(revision>0),
+ body TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS issue_history(
+ issue_id TEXT NOT NULL REFERENCES issues(issue_id),
+ revision INTEGER NOT NULL CHECK(revision>0),
+ body TEXT NOT NULL,
+ PRIMARY KEY(issue_id,revision));
+ PRAGMA user_version=3;`)
 	if e != nil {
 		return e
 	}
