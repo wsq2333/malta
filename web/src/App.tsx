@@ -1,3 +1,9 @@
+import {
+  workspaceSection,
+  workspaceNavigation,
+  workspaceTabs,
+} from "./workspace";
+import { AutomationPreview } from "./AutomationPreview";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Activity,
@@ -70,6 +76,8 @@ import {
 } from "./model";
 
 type Page =
+  | "automation"
+  | "suites"
   | "guide"
   | "cases"
   | "issues"
@@ -80,10 +88,12 @@ type Page =
   | "trends";
 const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
   [
+    { id: "automation", label: "测试中心", en: "Test center", icon: Activity },
+    { id: "suites", label: "用例管理", en: "Case library", icon: Layers3 },
     {
       id: "baselines",
-      label: "性能基线",
-      en: "Performance baselines",
+      label: "测试中心",
+      en: "Test center",
       icon: Layers3,
     },
     {
@@ -95,20 +105,20 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
     { id: "cases", label: "用例管理", en: "Benchmark cases", icon: Layers3 },
     {
       id: "versions",
-      label: "软件版本",
-      en: "Software versions",
+      label: "环境与版本",
+      en: "Environments & versions",
       icon: GitBranch,
     },
     {
       id: "environments",
-      label: "硬件环境",
-      en: "Hardware environments",
+      label: "环境与版本",
+      en: "Environments & versions",
       icon: Server,
     },
     {
       id: "trends",
-      label: "对比与趋势",
-      en: "Compare & trends",
+      label: "测试中心",
+      en: "Test center",
       icon: TrendingUp,
     },
     { id: "guide", label: "使用指南", en: "User guide", icon: BookOpen },
@@ -404,6 +414,8 @@ export function App() {
     ),
     activeCount = runs.filter((r) => !terminal(r.status)).length;
   const currentPage = pages.find((p) => p.id === page)!;
+  const prototype = page === "automation" || page === "suites";
+  const tabs = workspaceTabs(page);
   const notifyAction = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
     try {
@@ -532,7 +544,7 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="?page=baselines">
+        <a className="brand" href="?page=baselines&view=all">
           <span className="brand-mark">
             <Layers3 size={25} />
           </span>
@@ -542,20 +554,25 @@ export function App() {
         </a>
         <div className="workspace-label">BENCHMARK WORKSPACE</div>
         <nav>
-          {pages.map((p) => (
-            <button
-              key={p.id}
-              aria-label={p.label}
-              title={p.label}
-              onClick={() => setPage(p.id)}
-              className={page === p.id ? "active" : ""}
-            >
-              <p.icon size={19} />
-              <span>{p.label}</span>
-              {p.id === "baselines" && activeCount > 0 && <b>{activeCount}</b>}
-              {page === p.id && <ChevronRight size={16} />}
-            </button>
-          ))}
+          {workspaceNavigation.map((item) => {
+            const p = pages.find((p) => p.id === item.page)!;
+            return (
+              <button
+                key={p.id}
+                aria-label={p.label}
+                title={p.label}
+                onClick={() => setPage(p.id === "baselines" ? "runs" : p.id)}
+                className={workspaceSection(page) === p.id ? "active" : ""}
+              >
+                <p.icon size={19} />
+                <span>{p.label}</span>
+                {p.id === "baselines" && activeCount > 0 && (
+                  <b>{activeCount}</b>
+                )}
+                {workspaceSection(page) === p.id && <ChevronRight size={16} />}
+              </button>
+            );
+          })}
         </nav>
         <div className="sidebar-bottom">
           <div className="agent-note">
@@ -625,69 +642,121 @@ export function App() {
                 {currentPage.label}
                 <span className="live-tag">
                   <i />
-                  {page === "guide" ? "入门与示例" : "真实实验数据"}
+                  {prototype
+                    ? "交互原型 · 示例数据"
+                    : page === "guide"
+                      ? "入门与示例"
+                      : "真实实验数据"}
                 </span>
               </h1>
               <p>
-                {page === "guide"
-                  ? "从填写 JSON 到发起测试，逐步建立可靠的性能对照。"
-                  : page === "issues"
-                    ? "记录测试问题、追溯调查过程与解决方式。"
-                    : page === "cases"
-                      ? "保存测试定义，以不可变版本组织每一次实验。"
-                      : page === "baselines"
-                        ? "让每一次性能变化，都有可靠的参照。"
-                        : page === "runs"
-                          ? "管理测试生命周期，追溯每一份原始证据。"
-                          : page === "versions"
-                            ? "以不可变的版本身份，串联每一次测试。"
-                            : page === "environments"
-                              ? "按云环境与各角色机型归组，在执行快照中保留具体测试条件。"
-                              : "在相同测试条件下，观察版本与时间带来的变化。"}
+                {prototype
+                  ? "预览自动化验证与问题追踪流程，尚未接入执行服务。"
+                  : page === "guide"
+                    ? "从填写 JSON 到发起测试，逐步建立可靠的性能对照。"
+                    : page === "issues"
+                      ? "记录测试问题、追溯调查过程与解决方式。"
+                      : page === "cases"
+                        ? "保存测试定义，以不可变版本组织每一次实验。"
+                        : page === "baselines"
+                          ? "让每一次性能变化，都有可靠的参照。"
+                          : page === "runs"
+                            ? "管理测试生命周期，追溯每一份原始证据。"
+                            : page === "versions"
+                              ? "以不可变的版本身份，串联每一次测试。"
+                              : page === "environments"
+                                ? "按云环境与各角色机型归组，在执行快照中保留具体测试条件。"
+                                : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
-            <button
-              className="primary"
-              disabled={
-                !executors.length &&
-                ![
-                  "guide",
-                  "issues",
-                  "cases",
-                  "versions",
-                  "environments",
-                ].includes(page)
-              }
-              onClick={() =>
-                page === "guide"
-                  ? setPage("cases")
+            {!prototype && (
+              <button
+                className="primary"
+                disabled={
+                  !executors.length &&
+                  ![
+                    "guide",
+                    "issues",
+                    "cases",
+                    "versions",
+                    "environments",
+                  ].includes(page)
+                }
+                onClick={() =>
+                  page === "guide"
+                    ? setPage("cases")
+                    : page === "issues"
+                      ? setIssueCreate((n) => n + 1)
+                      : page === "cases"
+                        ? setCaseCreate((n) => n + 1)
+                        : openModal(
+                            page === "versions"
+                              ? "version"
+                              : page === "environments"
+                                ? "environment"
+                                : "start",
+                          )
+                }
+              >
+                <Plus size={17} />
+                {page === "guide"
+                  ? "前往用例管理"
                   : page === "issues"
-                    ? setIssueCreate((n) => n + 1)
+                    ? "登记问题"
                     : page === "cases"
-                      ? setCaseCreate((n) => n + 1)
-                      : openModal(
-                          page === "versions"
-                            ? "version"
-                            : page === "environments"
-                              ? "environment"
-                              : "start",
-                        )
-              }
-            >
-              <Plus size={17} />
-              {page === "guide"
-                ? "前往用例管理"
-                : page === "issues"
-                  ? "登记问题"
-                  : page === "cases"
-                    ? "新建用例"
-                    : page === "versions"
-                      ? "登记版本"
-                      : page === "environments"
-                        ? "登记执行快照"
-                        : "发起测试"}
-            </button>
+                      ? "新建用例"
+                      : page === "versions"
+                        ? "登记版本"
+                        : page === "environments"
+                          ? "登记执行快照"
+                          : "发起测试"}
+              </button>
+            )}
           </header>
+          {!detail && tabs.length > 0 && (
+            <div
+              className="workspace-tabs"
+              role="tablist"
+              aria-label="工作区分类"
+            >
+              {tabs.map((t) => (
+                <button
+                  key={t.page}
+                  role="tab"
+                  aria-selected={
+                    page === t.page ||
+                    (page === "trends" && t.page === "baselines")
+                  }
+                  onClick={() => setPage(t.page as Page)}
+                >
+                  {t.label}
+                </button>
+              ))}
+              {page === "baselines" && (
+                <button
+                  className="secondary workspace-compare"
+                  onClick={() => setPage("trends")}
+                >
+                  <TrendingUp size={16} />
+                  对比与趋势
+                </button>
+              )}
+            </div>
+          )}
+          {page === "trends" && (
+            <BackToList
+              label="返回性能测试"
+              onClick={() => setPage("baselines")}
+            />
+          )}
+          {prototype && (
+            <AutomationPreview
+              mode={page === "suites" ? "suites" : "runs"}
+              detail={detail}
+              onDetail={setDetail}
+              onNavigate={(next) => setPage(next)}
+            />
+          )}
           {managementOnly && (
             <div className="alert">
               当前为仅管理服务：可管理问题、用例、版本、环境与已有结果；测试执行尚未启用。
@@ -711,89 +780,86 @@ export function App() {
           )}
           {!detail && (page === "baselines" || page === "trends") && (
             <>
-              <section className="stats">
-                <Stat
-                  icon={Layers3}
-                  label="已设基线"
-                  value={matchingBaselines.length}
-                  note="当前筛选条件"
-                />
-                <Stat
-                  icon={Check}
-                  label="成功实验"
-                  value={successful.length}
-                  note="证据已持久化"
-                />
-                <Stat
-                  icon={Server}
-                  label="硬件环境"
-                  value={hardwareGroups.length}
-                  note={`${environments.length} 份执行快照`}
-                />
-                <Stat
-                  icon={Activity}
-                  label="进行中"
-                  value={activeCount}
-                  note="准备 / 运行 / 排队"
-                />
-              </section>
-              <section className="panel filters">
-                <div className="filters-title">
-                  <Settings2 size={16} /> 实验条件
-                </div>
-                <Select
-                  label="执行快照"
-                  value={env}
-                  onChange={chooseEnvironment}
-                >
-                  <option value="">全部执行快照</option>
-                  {hardwareGroups.map((group) => (
-                    <optgroup key={group.key} label={hardwareLabel(group)}>
-                      {group.snapshots.map((snapshot) => (
-                        <option key={snapshot.id} value={snapshot.id}>
-                          {snapshot.name} · {snapshot.id}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </Select>
-                <Select
-                  label="软件版本"
-                  value={version}
-                  onChange={(v) => {
-                    setVersion(v);
-                    setBaseline("");
-                    setCandidate("");
-                    setRuns([]);
-                    setSelected(null);
-                  }}
-                >
-                  <option value="">全部版本</option>
-                  {versions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.filesystem} {v.label}
-                    </option>
-                  ))}
-                </Select>
-                <label className="select-label">
-                  <span>起始日期</span>
-                  <input
-                    aria-label="起始日期"
-                    type="date"
-                    value={from}
-                    onChange={(e) => setFrom(e.target.value)}
-                  />
-                </label>
-                <label className="select-label">
-                  <span>结束日期</span>
-                  <input
-                    aria-label="结束日期"
-                    type="date"
-                    value={to}
-                    onChange={(e) => setTo(e.target.value)}
-                  />
-                </label>
-              </section>
+              <div className="workspace-summary" aria-label="测试概况">
+                <span>
+                  <b>{matchingBaselines.length}</b> 已设基线
+                </span>
+                <span>
+                  <b>{successful.length}</b> 成功实验
+                </span>
+                <span>
+                  <b>{activeCount}</b> 进行中
+                </span>
+                <span>
+                  <b>{hardwareGroups.length}</b> 类硬件
+                </span>
+              </div>
+              <details
+                className="workspace-filters"
+                open={env || version || from || to ? true : undefined}
+              >
+                <summary>
+                  版本、环境与日期筛选
+                  {env || version || from || to ? " · 已启用" : ""}
+                </summary>
+                <section className="panel filters">
+                  <div className="filters-title">
+                    <Settings2 size={16} /> 实验条件
+                  </div>
+                  <Select
+                    label="执行快照"
+                    value={env}
+                    onChange={chooseEnvironment}
+                  >
+                    <option value="">全部执行快照</option>
+                    {hardwareGroups.map((group) => (
+                      <optgroup key={group.key} label={hardwareLabel(group)}>
+                        {group.snapshots.map((snapshot) => (
+                          <option key={snapshot.id} value={snapshot.id}>
+                            {snapshot.name} · {snapshot.id}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </Select>
+                  <Select
+                    label="软件版本"
+                    value={version}
+                    onChange={(v) => {
+                      setVersion(v);
+                      setBaseline("");
+                      setCandidate("");
+                      setRuns([]);
+                      setSelected(null);
+                    }}
+                  >
+                    <option value="">全部版本</option>
+                    {versions.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.filesystem} {v.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <label className="select-label">
+                    <span>起始日期</span>
+                    <input
+                      aria-label="起始日期"
+                      type="date"
+                      value={from}
+                      onChange={(e) => setFrom(e.target.value)}
+                    />
+                  </label>
+                  <label className="select-label">
+                    <span>结束日期</span>
+                    <input
+                      aria-label="结束日期"
+                      type="date"
+                      value={to}
+                      onChange={(e) => setTo(e.target.value)}
+                    />
+                  </label>
+                </section>
+              </details>
             </>
           )}
           {page === "cases" && (
@@ -815,19 +881,19 @@ export function App() {
           )}
           {page === "baselines" && !detail && (
             <section className="panel results-panel">
-              <div className="tabs catalog-tabs">
-                <button
-                  className={catalogView === "saved" ? "selected" : ""}
-                  onClick={() => setCatalogView("saved")}
-                >
-                  已设基线
-                </button>
-                <button
-                  className={catalogView === "all" ? "selected" : ""}
-                  onClick={() => setCatalogView("all")}
-                >
-                  全部测试{activeCount > 0 ? ` · ${activeCount} 项进行中` : ""}
-                </button>
+              <div className="catalog-toolbar">
+                <label>
+                  显示范围{" "}
+                  <select
+                    aria-label="测试显示范围"
+                    value={catalogView}
+                    onChange={(e) => setCatalogView(e.target.value)}
+                  >
+                    <option value="all">全部测试</option>
+                    <option value="saved">已设基线</option>
+                  </select>
+                </label>
+                <span className="muted">数据 I/O、元数据与混合场景</span>
               </div>
               <div className="panel-top">
                 <div className="tabs">
