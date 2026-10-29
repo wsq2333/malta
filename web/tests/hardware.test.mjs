@@ -77,28 +77,30 @@ test("different client models stay distinct and an ambiguous server-only snapsho
   );
 });
 
-test("provider, region, roles and missing location do not accidentally merge", () => {
+test("regions share a hardware category, while provider, roles and unknown cloud identity remain distinct", () => {
   const groups = groupHardware([
     snapshot("a"),
     { ...snapshot("region"), region: "another-region" },
     { ...snapshot("provider"), provider: "other-cloud" },
     snapshot("role", {}, [{ ...server, role: "worker" }, client]),
-    { ...snapshot("unknown-a"), region: "" },
-    { ...snapshot("unknown-b"), region: "" },
+    { ...snapshot("unknown-a"), provider: "" },
+    { ...snapshot("unknown-b"), provider: "" },
   ]);
-  assert.equal(groups.length, 6);
+  assert.equal(groups.length, 5);
 });
 
-test("node counts are displayed as snapshot differences, while rows and ordering do not multiply machine types", () => {
+test("node counts define separate hardware categories, while row ordering does not multiply machines", () => {
   const groups = groupHardware([
     snapshot("a", {}, [{ ...server, count: 3 }, client]),
     snapshot("b", {}, [client, server, server, server]),
     snapshot("c", {}, [{ ...server, count: 6 }, client]),
   ]);
-  assert.equal(groups.length, 1);
+  assert.equal(groups.length, 2);
   assert.equal(groups[0].machines.length, 2);
   assert.deepEqual(
-    groups[0].machines.find((m) => m.role.includes("共置")).counts,
-    [3, 6],
+    groups
+      .find((g) => g.snapshots.some((s) => s.id === "a"))
+      .machines.find((m) => m.role.includes("共置")).counts,
+    [3],
   );
 });

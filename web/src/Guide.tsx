@@ -57,9 +57,12 @@ function CodeExample({
           )}
         </div>
       </div>
-      <pre tabIndex={0} aria-label={title}>
-        <code>{text}</code>
-      </pre>
+      <details>
+        <summary>展开 JSON 示例</summary>
+        <pre tabIndex={0} aria-label={title}>
+          <code>{text}</code>
+        </pre>
+      </details>
       <span className="guide-copy-status" role="status">
         {message}
       </span>
@@ -395,7 +398,7 @@ export function Guide({
             <strong>提交并等待。</strong> 每次新实验使用新的 Request ID（例如{" "}
             <code>read-v1-20261027-001</code>
             ）；同一次提交遇到网络问题重试时复用原
-            ID。到「测试运行」观察排队、准备、运行和日志。
+            ID。到「全部测试」观察排队、准备、运行和日志。
           </li>
           <li>
             <strong>确认完成。</strong> 只有状态为「已完成」且证据为{" "}
@@ -418,7 +421,7 @@ malta --server ${origin} run wait RUN_ID --timeout 2m`}
           改为可访问的服务地址。等待超时不会自动取消运行，可以继续查询或显式取消。
         </p>
         <button className="secondary" onClick={() => onNavigate("runs")}>
-          前往测试运行 <ArrowRight size={15} />
+          前往全部测试 <ArrowRight size={15} />
         </button>
       </section>
       <section className="panel guide-section" id="compare">

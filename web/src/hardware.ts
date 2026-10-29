@@ -8,6 +8,7 @@ export interface HardwareMachine {
 export interface HardwareGroup {
   key: string;
   location: string;
+  provider: string;
   machines: HardwareMachine[];
   snapshots: Environment[];
   incompleteSnapshotIds: string[];
@@ -29,6 +30,8 @@ function role(value: string): string {
   };
   return aliases[normalized] || normalized;
 }
+const configurationKey = (m: { role: string; model: string; count: number }) =>
+  JSON.stringify([m.role, m.model, m.count]);
 const machineKey = (m: { role: string; model: string }) =>
   JSON.stringify([m.role, m.model]);
 
@@ -55,11 +58,10 @@ export function groupHardware(environments: Environment[]): HardwareGroup[] {
     );
     const provider = environment.provider.trim();
     const region = environment.region.trim();
-    // An unspecified location is not evidence that two physical environments match.
+    // Categories describe cloud + topology + models, not physical cluster identity.
     const scope = JSON.stringify([
       provider || environment.kind,
-      region,
-      provider && region ? "" : environment.id,
+      provider ? "" : environment.id,
     ]);
     return {
       environment,
@@ -68,7 +70,7 @@ export function groupHardware(environments: Environment[]): HardwareGroup[] {
       location: [provider || environment.kind, region]
         .filter(Boolean)
         .join(" / "),
-      key: JSON.stringify([scope, models.map(machineKey)]),
+      key: JSON.stringify([scope, models.map(configurationKey)]),
       client: models.some((m) => m.role === "测试客户端"),
     };
   });
@@ -87,8 +89,8 @@ export function groupHardware(environments: Environment[]): HardwareGroup[] {
               JSON.stringify(
                 other.models
                   .filter((m) => m.role !== "测试客户端")
-                  .map(machineKey),
-              ) === JSON.stringify(entry.models.map(machineKey)),
+                  .map(configurationKey),
+              ) === JSON.stringify(entry.models.map(configurationKey)),
           )
           .map((other) => [other.key, other]),
       );
@@ -99,6 +101,8 @@ export function groupHardware(environments: Environment[]): HardwareGroup[] {
       group = {
         key: destination.key,
         location: destination.location,
+        provider:
+          destination.environment.provider || destination.environment.kind,
         machines: destination.models.map((m) => ({
           role: m.role,
           model: m.model,
@@ -130,5 +134,5 @@ export function groupHardware(environments: Environment[]): HardwareGroup[] {
 }
 
 export function hardwareLabel(group: HardwareGroup): string {
-  return `${group.location} · ${group.machines.map((m) => `${m.role} ${m.model}`).join(" / ")}`;
+  return `${group.provider} · ${group.machines.map((m) => `${m.role} ${m.counts[0]} × ${m.model}`).join(" / ")}`;
 }

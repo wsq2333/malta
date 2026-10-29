@@ -1939,3 +1939,143 @@ td strong {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 0 28px;
 }
+
+/* Human-readable catalogs and standalone record detail views. */
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 18px;
+  padding: 16px 0;
+}
+.results-panel > .record-grid,
+.case-library > .record-grid,
+.panel > .record-grid {
+  padding: 20px;
+}
+.record-card {
+  padding: 22px;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.record-card h2 {
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.record-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.record-card > button {
+  align-self: flex-start;
+}
+.record-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.record-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.record-detail {
+  padding: 28px;
+}
+.record-detail h2 {
+  margin: 0 0 22px;
+  font-size: 23px;
+}
+.record-detail h3 {
+  font-size: 16px;
+  margin: 24px 0 12px;
+}
+.record-back {
+  margin-bottom: 20px;
+}
+.readable-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 18px 24px;
+  margin: 20px 0;
+}
+.readable-facts > div {
+  min-width: 0;
+}
+.readable-facts dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+.readable-facts dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.record-card .readable-facts {
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0;
+}
+.record-tabs,
+.catalog-tabs {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+  margin-bottom: 22px;
+  display: flex;
+  flex-wrap: wrap;
+}
+.catalog-tabs {
+  padding: 20px;
+  margin: 0;
+}
+.technical-info {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 18px;
+}
+.technical-info summary,
+.comparison-metrics summary {
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+.technical-info pre {
+  max-height: 480px;
+  overflow: auto;
+}
+.snapshot-picker {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 20px 0;
+}
+.snapshot-picker select {
+  width: 100%;
+  min-width: 0;
+}
+.scenario-summary section {
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+@media (max-width: 700px) {
+  .record-detail {
+    padding: 18px;
+  }
+  .record-grid {
+    grid-template-columns: 1fr;
+  }
+}
