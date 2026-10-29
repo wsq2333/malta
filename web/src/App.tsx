@@ -24,6 +24,8 @@ import {
   X,
 } from "lucide-react";
 import { Issues } from "./Issues";
+import { HardwareEnvironments } from "./HardwareEnvironments";
+import { groupHardware, hardwareLabel } from "./hardware";
 import { Guide } from "./Guide";
 import { Chart } from "./LazyChart";
 import { Cases, CasePicker, type CaseVersion } from "./Cases";
@@ -190,6 +192,10 @@ export function App() {
     baseline,
     candidate,
   ]);
+  const hardwareGroups = useMemo(
+    () => groupHardware(environments),
+    [environments],
+  );
   useEffect(() => {
     let valid = true;
     setLoading(true);
@@ -549,7 +555,7 @@ export function App() {
                           : page === "versions"
                             ? "以不可变的版本身份，串联每一次测试。"
                             : page === "environments"
-                              ? "记录云实例与物理硬件，固定公平对照的条件。"
+                              ? "按云环境与各角色机型归组，在执行快照中保留具体测试条件。"
                               : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
@@ -591,7 +597,7 @@ export function App() {
                     : page === "versions"
                       ? "登记版本"
                       : page === "environments"
-                        ? "登记环境"
+                        ? "登记执行快照"
                         : "发起测试"}
             </button>
           </header>
@@ -629,8 +635,8 @@ export function App() {
                 <Stat
                   icon={Server}
                   label="硬件环境"
-                  value={environments.length}
-                  note="不可变配置快照"
+                  value={hardwareGroups.length}
+                  note={`${environments.length} 份执行快照`}
                 />
                 <Stat
                   icon={Activity}
@@ -644,15 +650,19 @@ export function App() {
                   <Settings2 size={16} /> 实验条件
                 </div>
                 <Select
-                  label="硬件环境"
+                  label="执行快照"
                   value={env}
                   onChange={chooseEnvironment}
                 >
-                  <option value="">全部环境</option>
-                  {environments.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name} · {e.kind}
-                    </option>
+                  <option value="">全部执行快照</option>
+                  {hardwareGroups.map((group) => (
+                    <optgroup key={group.key} label={hardwareLabel(group)}>
+                      {group.snapshots.map((snapshot) => (
+                        <option key={snapshot.id} value={snapshot.id}>
+                          {snapshot.name} · {snapshot.id}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </Select>
                 <Select
@@ -1081,63 +1091,13 @@ export function App() {
             </section>
           )}
           {page === "environments" && (
-            <div className="environment-grid">
-              {environments.length === 0 ? (
-                <section className="panel">
-                  <Empty
-                    title="还没有硬件环境"
-                    text="记录云环境与实例类型，或物理机器型号及客户端 / 服务端拓扑。"
-                  />
-                </section>
-              ) : (
-                environments.map((e) => (
-                  <section className="panel environment-card" key={e.id}>
-                    <header>
-                      <span className="environment-icon">
-                        <Server size={22} />
-                      </span>
-                      <span className="pill">{e.kind}</span>
-                    </header>
-                    <h2>{e.name}</h2>
-                    <p className="mono muted">{e.id}</p>
-                    <div className="environment-location">
-                      {[e.provider, e.region].filter(Boolean).join(" / ") ||
-                        "未登记云区域"}
-                      <span>{e.os || "OS 未登记"}</span>
-                    </div>
-                    {e.machines.map((m, i) => (
-                      <div className="machine" key={i}>
-                        <div>
-                          <strong>{m.role}</strong>
-                          <span>{m.count} 台</span>
-                        </div>
-                        <b>{m.model}</b>
-                        <p>
-                          {m.cpu} ·{" "}
-                          {m.memory_bytes ? size(m.memory_bytes) : "内存未登记"}
-                        </p>
-                        <p>
-                          {m.storage} · {m.network}
-                        </p>
-                      </div>
-                    ))}
-                    <details>
-                      <summary>配置快照</summary>
-                      <pre>{JSON.stringify(e.config, null, 2)}</pre>
-                    </details>
-                    <button
-                      className="secondary full"
-                      onClick={() => {
-                        chooseEnvironment(e.id);
-                        setPage("baselines");
-                      }}
-                    >
-                      查看环境基线 <ArrowRight size={15} />
-                    </button>
-                  </section>
-                ))
-              )}
-            </div>
+            <HardwareEnvironments
+              groups={hardwareGroups}
+              onSelectSnapshot={(id) => {
+                chooseEnvironment(id);
+                setPage("baselines");
+              }}
+            />
           )}
           {page === "trends" && (
             <>

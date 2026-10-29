@@ -1885,3 +1885,57 @@ td strong {
   display: block;
   margin-top: 6px;
 }
+
+/* Hardware categories retain separate, immutable execution snapshots. */
+.hardware-explanation {
+  padding: 18px 22px;
+  margin-bottom: 20px;
+}
+.hardware-explanation p,
+.hardware-snapshots > p {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.hardware-snapshots {
+  margin-top: 18px;
+}
+.hardware-snapshot {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.hardware-snapshot h3 {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hardware-snapshot > p {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.hardware-snapshot dl {
+  display: grid;
+  grid-template-columns: minmax(85px, 1fr) minmax(0, 2fr);
+  gap: 8px 12px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.hardware-snapshot dt {
+  color: var(--text-muted);
+}
+.hardware-snapshot dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.hardware-snapshot details {
+  font-size: 11px;
+}
+
+.hardware-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+.hardware-snapshot-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 0 28px;
+}

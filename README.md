@@ -54,7 +54,7 @@ bin/malta --server http://127.0.0.1:8080 baseline set --name initial --run RUN_I
 bin/malta --server http://127.0.0.1:8080 compare --baseline RUN_ID --candidate OTHER_RUN_ID
 ```
 
-示例环境含 `unknown`，仅用于功能验证。正式基线请填写实际硬件/系统/挂载配置，并使用独立环境 ID。`benchmarks/data/lab-randread.yaml` 是更大的扫描模板，执行前明确容量与资源预算。
+示例环境含 `unknown`，仅用于功能验证。正式基线请填写实际硬件/系统/挂载配置，并使用独立环境 ID。硬件页面按云厂商、区域和各角色机型归组；UID/GID、额度、镜像等保留在组内执行快照，详见[硬件分类与执行快照](docs/hardware-environments.md)。`benchmarks/data/lab-randread.yaml` 是更大的扫描模板，执行前明确容量与资源预算。
 
 服务默认监听 loopback。设置 `MALTA_TOKEN` 后 API 使用 Bearer 认证；绑定非 loopback 必须配置 Token，远程使用另配 TLS 代理或 SSH 隧道。UI 右上角连接设置可输入已有 Token，凭证仅保存在当前浏览器会话。
 
