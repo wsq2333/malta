@@ -1,3 +1,9 @@
+import {
+  BackToList,
+  RecordCard,
+  WorkloadFacts,
+  TechnicalInfo,
+} from "./RecordViews";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BookOpen, Plus, Play, Pencil, Download, Search } from "lucide-react";
 import { api, date, type Plan, type Run } from "./model";
@@ -127,17 +133,20 @@ export function Cases({
   runs,
   onStart,
   canStart,
+  activeID,
+  setActiveID,
 }: {
   tick: number;
   createSignal: number;
   runs: Run[];
   onStart: (v: CaseVersion) => void;
   canStart: boolean;
+  activeID: string;
+  setActiveID: (id: string) => void;
 }) {
   const [cases, setCases] = useState<TestCase[]>([]),
     [history, setHistory] = useState<CaseVersion[]>([]),
     [selected, setSelected] = useState<CaseVersion | null>(null),
-    [activeID, setActiveID] = useState(""),
     [query, setQuery] = useState(""),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -246,95 +255,74 @@ export function Cases({
   );
   return (
     <>
-      <section className="panel case-library">
-        <div className="panel-top">
-          <div>
-            <div className="eyebrow">CASE LIBRARY</div>
-            <h2>
-              用例库 <span className="pill">{cases.length} 个用例</span>
-            </h2>
-            <p className="muted">完整计划 · 版本快照 · 可重复执行</p>
+      {!activeID && (
+        <section className="panel case-library">
+          <div className="panel-top">
+            <div>
+              <div className="eyebrow">CASE LIBRARY</div>
+              <h2>
+                用例库 <span className="pill">{cases.length} 个用例</span>
+              </h2>
+              <p className="muted">完整计划 · 版本快照 · 可重复执行</p>
+            </div>
+            <BookOpen size={28} />
           </div>
-          <BookOpen size={28} />
-        </div>
-        <div className="case-toolbar">
-          <Search size={17} />
-          <input
-            aria-label="搜索用例"
-            placeholder="搜索名称、描述或 ID"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button className="secondary" onClick={create}>
-            <Plus size={15} />
-            新建用例
-          </button>
-        </div>
-        {error && (
-          <div className="alert error" role="alert">
-            {error}
-            <button onClick={() => setReload((x) => x + 1)}>重试</button>
+          <div className="case-toolbar">
+            <Search size={17} />
+            <input
+              aria-label="搜索用例"
+              placeholder="搜索名称、描述或 ID"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button className="secondary" onClick={create}>
+              <Plus size={15} />
+              新建用例
+            </button>
           </div>
-        )}
-        {loading ? (
-          <p className="case-padding muted">正在加载用例…</p>
-        ) : visible.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>用例 / 描述</th>
-                  <th>类型</th>
-                  <th>最新版本</th>
-                  <th>创建时间</th>
-                  <th>更新时间</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((c) => (
-                  <tr
-                    key={c.id}
-                    className={activeID === c.id ? "case-active" : ""}
-                  >
-                    <td>
-                      <button
-                        className="case-title"
-                        onClick={() => setActiveID(c.id)}
-                      >
-                        {c.latest.name}
-                      </button>
-                      <p className="case-description muted">
-                        {c.latest.description || "暂无描述"}
-                      </p>
-                    </td>
-                    <td>{kindLabel(c.latest.plan.spec.kind)}</td>
-                    <td>
-                      <span className="pill">v{c.latest.revision}</span>
-                    </td>
-                    <td>{date(c.created_at)}</td>
-                    <td>{date(c.updated_at)}</td>
-                    <td>
-                      <button
-                        className="secondary"
-                        onClick={() => setActiveID(c.id)}
-                      >
-                        查看版本
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty
-            title={query ? "没有匹配的用例" : "建立你的第一个用例"}
-            text="保存计划 JSON，也可以从已有测试运行中载入。每次编辑都会生成新版本。"
-          />
-        )}
-      </section>
-      {selected && (
+          {error && (
+            <div className="alert error" role="alert">
+              {error}
+              <button onClick={() => setReload((x) => x + 1)}>重试</button>
+            </div>
+          )}
+          {loading ? (
+            <p className="case-padding muted">正在加载用例…</p>
+          ) : visible.length ? (
+            <div className="record-grid">
+              {visible.map((c) => (
+                <RecordCard
+                  key={c.id}
+                  title={c.latest.name}
+                  subtitle={
+                    <>
+                      {kindLabel(c.latest.plan.spec.kind)} · 修订 v
+                      {c.latest.revision}
+                    </>
+                  }
+                  onOpen={() => setActiveID(c.id)}
+                >
+                  <p className="record-description">
+                    {c.latest.description || "暂无描述"}
+                  </p>
+                  <p className="muted">更新于 {date(c.updated_at)}</p>
+                </RecordCard>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              title={query ? "没有匹配的用例" : "建立你的第一个用例"}
+              text="保存计划 JSON，也可以从已有测试运行中载入。每次编辑都会生成新版本。"
+            />
+          )}
+        </section>
+      )}
+      {activeID && (
+        <BackToList label="返回用例列表" onClick={() => setActiveID("")} />
+      )}
+      {activeID && error && <p role="alert">{error}</p>}
+      {activeID && !selected && !error && <p>正在加载用例详情…</p>}
+      {selected && activeID && (
         <section className="panel case-library">
           <div className="panel-top">
             <div>
@@ -343,13 +331,12 @@ export function Cases({
                 {selected.name}{" "}
                 <span className="pill">v{selected.revision}</span>
               </h2>
-              <p className="mono muted">{selected.case_id}</p>
             </div>
           </div>
           <div className="case-padding">
             <div className="case-actions">
               <label>
-                历史版本{" "}
+                历史修订{" "}
                 <select
                   aria-label="查看历史版本"
                   value={selected.revision}
@@ -400,16 +387,10 @@ export function Cases({
               <span>软件：{selected.plan.version.label}</span>
               <span>目标：{selected.plan.target}</span>
             </div>
-            <label className="case-json-label">
-              执行计划 JSON（只读快照）
-              <textarea
-                aria-label="用例版本 JSON"
-                readOnly
-                spellCheck={false}
-                rows={16}
-                value={pretty(selected.plan)}
-              />
-            </label>
+            <WorkloadFacts plan={selected.plan} />
+            <TechnicalInfo value={selected.plan}>
+              <p>用例 ID：{selected.case_id}</p>
+            </TechnicalInfo>
           </div>
         </section>
       )}

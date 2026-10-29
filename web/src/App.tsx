@@ -23,6 +23,16 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { RunCatalog } from "./RunCatalog";
+import { Versions } from "./Versions";
+import {
+  BackToList,
+  WorkloadFacts,
+  TechnicalInfo,
+  RecordCard,
+  Facts,
+} from "./RecordViews";
+import { catalogRoute } from "./catalog";
 import { Issues } from "./Issues";
 import { HardwareEnvironments } from "./HardwareEnvironments";
 import { groupHardware, hardwareLabel } from "./hardware";
@@ -76,7 +86,6 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
       en: "Performance baselines",
       icon: Layers3,
     },
-    { id: "runs", label: "测试运行", en: "Benchmark runs", icon: Activity },
     {
       id: "issues",
       label: "问题管理",
@@ -117,9 +126,38 @@ export function App() {
     }
   }, [theme]);
   const initial = new URLSearchParams(location.search);
-  const [page, setPage] = useState<Page>(
-    pages.find((p) => p.id === initial.get("page"))?.id || "baselines",
+  const route = catalogRoute(initial);
+  const [page, setPageState] = useState<Page>(
+    pages.find((p) => p.id === route.page)?.id || "baselines",
   );
+  const [catalogView, setCatalogView] = useState(route.view);
+  const [detail, setDetailState] = useState(initial.get("detail") || "");
+  const [detailLoading, setDetailLoading] = useState(false);
+  function setDetail(id: string) {
+    const q = new URLSearchParams(location.search);
+    if (id) q.set("detail", id);
+    else q.delete("detail");
+    history.pushState(null, "", `?${q}`);
+    setDetailState(id);
+    setLogs(null);
+  }
+  function setPage(next: Page) {
+    const canonical = next === "runs" ? "baselines" : next;
+    const q = new URLSearchParams(location.search);
+    q.set("page", canonical);
+    q.delete("detail");
+    if (next === "runs") q.set("view", "all");
+    history.pushState(null, "", `?${q}`);
+    setPageState(canonical);
+    setDetailState("");
+    setSelected(null);
+    if (next === "runs") setCatalogView("all");
+  }
+  function showRun(id: string) {
+    if (page !== "baselines") setPage("runs");
+    setDetail(id);
+  }
+
   const [kind, setKind] = useState(initial.get("kind") || "data"),
     [env, setEnv] = useState(initial.get("environment") || ""),
     [version, setVersion] = useState(initial.get("version") || ""),
@@ -165,6 +203,8 @@ export function App() {
     const q = new URLSearchParams();
     Object.entries({
       page,
+      view: catalogView,
+      detail,
       kind,
       environment: env,
       version,
@@ -181,6 +221,8 @@ export function App() {
     history.replaceState(null, "", `?${q}`);
   }, [
     page,
+    catalogView,
+    detail,
     kind,
     env,
     version,
@@ -192,6 +234,50 @@ export function App() {
     baseline,
     candidate,
   ]);
+  useEffect(() => {
+    const restore = () => {
+      const q = new URLSearchParams(location.search),
+        route = catalogRoute(q);
+      setPageState(pages.find((p) => p.id === route.page)?.id || "baselines");
+      setCatalogView(route.view);
+      setDetailState(q.get("detail") || "");
+      setSelected(null);
+      setKind(q.get("kind") || "data");
+      setEnv(q.get("environment") || "");
+      setVersion(q.get("version") || "");
+      setOperation(q.get("operation") || "");
+      setFileSize(q.get("file_size") || "");
+      setBlockSize(q.get("block_size") || "");
+      setFrom(q.get("from") || "");
+      setTo(q.get("to") || "");
+      setBaseline(q.get("baseline") || "");
+      setCandidate(q.get("candidate") || "");
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  useEffect(() => {
+    let live = true;
+    if (!detail || page !== "baselines") {
+      setSelected(null);
+      return;
+    }
+    setDetailLoading(true);
+    setSelected((old) => (old?.id === detail ? old : null));
+    api<Run>(`/runs/${encodeURIComponent(detail)}`)
+      .then((r) => {
+        if (live) setSelected(r);
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      })
+      .finally(() => {
+        if (live) setDetailLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [detail, page, tick]);
   const hardwareGroups = useMemo(
     () => groupHardware(environments),
     [environments],
@@ -227,9 +313,6 @@ export function App() {
           setExecutor((old) =>
             caps.executors.includes(old) ? old : caps.executors[0] || "",
           );
-          setSelected((old) =>
-            old ? r.find((x) => x.id === old.id) || null : null,
-          );
         }
       })
       .catch((e) => {
@@ -249,12 +332,15 @@ export function App() {
     if (
       !runs.some(
         (r) => !terminal(r.status) || r.attempt.result_state === "collecting",
-      )
+      ) &&
+      (!selected ||
+        (terminal(selected.status) &&
+          selected.attempt.result_state !== "collecting"))
     )
       return;
     const timer = setInterval(refresh, 2000);
     return () => clearInterval(timer);
-  }, [runs]);
+  }, [runs, selected]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4000);
@@ -371,8 +457,9 @@ export function App() {
           source: "human",
           executor,
         });
+        setCatalogView("all");
+        showRun(run.id);
         setSelected(run);
-        setPage("runs");
       } else if (modal === "baseline") {
         if (!selected) throw new Error("请先选择运行");
         await api("/baselines", { name: baselineName, run_id: selected.id });
@@ -465,7 +552,7 @@ export function App() {
             >
               <p.icon size={19} />
               <span>{p.label}</span>
-              {p.id === "runs" && activeCount > 0 && <b>{activeCount}</b>}
+              {p.id === "baselines" && activeCount > 0 && <b>{activeCount}</b>}
               {page === p.id && <ChevronRight size={16} />}
             </button>
           ))}
@@ -615,9 +702,14 @@ export function App() {
           )}
           {page === "guide" && <Guide onNavigate={setPage} />}
           {page === "issues" && (
-            <Issues tick={tick} createSignal={issueCreate} />
+            <Issues
+              tick={tick}
+              createSignal={issueCreate}
+              active={detail}
+              setActive={setDetail}
+            />
           )}
-          {page !== "issues" && page !== "cases" && page !== "guide" && (
+          {!detail && (page === "baselines" || page === "trends") && (
             <>
               <section className="stats">
                 <Stat
@@ -708,6 +800,8 @@ export function App() {
             <Cases
               tick={tick}
               createSignal={caseCreate}
+              activeID={detail}
+              setActiveID={setDetail}
               runs={runs}
               canStart={executors.length > 0}
               onStart={(v) => {
@@ -719,8 +813,22 @@ export function App() {
               }}
             />
           )}
-          {(page === "baselines" || page === "runs") && (
+          {page === "baselines" && !detail && (
             <section className="panel results-panel">
+              <div className="tabs catalog-tabs">
+                <button
+                  className={catalogView === "saved" ? "selected" : ""}
+                  onClick={() => setCatalogView("saved")}
+                >
+                  已设基线
+                </button>
+                <button
+                  className={catalogView === "all" ? "selected" : ""}
+                  onClick={() => setCatalogView("all")}
+                >
+                  全部测试{activeCount > 0 ? ` · ${activeCount} 项进行中` : ""}
+                </button>
+              </div>
               <div className="panel-top">
                 <div className="tabs">
                   <button
@@ -835,190 +943,25 @@ export function App() {
                 </label>
               </div>
               {loading && !runs.length ? (
-                <div className="empty loading">
-                  <RefreshCw className="spin" />
-                  正在加载实验…
-                </div>
-              ) : visible.length === 0 ? (
-                <Empty />
+                <p className="case-padding">正在加载测试…</p>
               ) : (
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>版本 / 测试负载</th>
-                        <th>环境 / 日期</th>
-                        {kind === "data" ? (
-                          <>
-                            <th>文件 / I/O 块</th>
-                            <th>最高已测吞吐</th>
-                          </>
-                        ) : kind === "scenario" ? (
-                          <>
-                            <th>阶段 / 子负载</th>
-                            <th>完成情况</th>
-                          </>
-                        ) : (
-                          <>
-                            <th>对象 / 工具</th>
-                            <th>Create / Stat / Remove</th>
-                          </>
-                        )}
-                        <th>状态</th>
-                        <th>对照</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visible.map((r) => {
-                        const p = peak(r),
-                          isBaseline = baselines.some((b) => b.run_id === r.id),
-                          summaries = summarize(r);
-                        return (
-                          <tr
-                            key={r.id}
-                            className={selected?.id === r.id ? "highlight" : ""}
-                            onClick={() => {
-                              setSelected(r);
-                              setLogs(null);
-                            }}
-                          >
-                            <td>
-                              <strong>{r.plan.version.label}</strong>
-                              <span>
-                                {r.plan.spec.kind === "data"
-                                  ? operationLabel[
-                                      r.plan.spec.workload.operation
-                                    ]
-                                  : r.plan.spec.name}
-                                <span className="tiny-dot">·</span>
-                                {r.plan.version.filesystem}
-                              </span>
-                            </td>
-                            <td>
-                              <strong>{r.plan.environment.name}</strong>
-                              <span>{date(r.created_at)}</span>
-                            </td>
-                            {kind === "data" ? (
-                              <>
-                                <td>
-                                  <strong>
-                                    {size(r.plan.spec.workload.file_size_bytes)}{" "}
-                                    <span className="inline-muted">
-                                      /{" "}
-                                      {size(
-                                        r.plan.spec.workload.block_size_bytes,
-                                      )}
-                                    </span>
-                                  </strong>
-                                  <span>
-                                    {r.plan.spec.workload.direct
-                                      ? "Direct"
-                                      : "Buffered"}{" "}
-                                    · {r.plan.spec.workload.cache_state}
-                                  </span>
-                                </td>
-                                <td>
-                                  <strong className="metric-number">
-                                    {format(p?.median, "bytes/s")}
-                                  </strong>
-                                  <span>
-                                    {p
-                                      ? `${p.operation} · ${p.numjobs} jobs × depth ${p.iodepth}`
-                                      : "无完整测量"}
-                                  </span>
-                                </td>
-                              </>
-                            ) : kind === "scenario" ? (
-                              <>
-                                <td>
-                                  <strong>
-                                    {r.plan.spec.scenario?.stages.length} 个阶段
-                                  </strong>
-                                  <span>
-                                    {r.plan.spec.scenario?.stages
-                                      .map((s) => s.mode)
-                                      .join(" → ")}
-                                  </span>
-                                </td>
-                                <td>
-                                  <strong>
-                                    {
-                                      r.trials.filter(
-                                        (t) => t.status === "succeeded",
-                                      ).length
-                                    }{" "}
-                                    / {r.plan.trials.length} 子负载实验
-                                  </strong>
-                                  <span>展开查看分组指标与测量时间线</span>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td>
-                                  <strong>
-                                    {r.plan.spec.metadata?.files_per_task ||
-                                      "—"}{" "}
-                                    文件 / task
-                                  </strong>
-                                  <span>{r.tool_version || "—"}</span>
-                                </td>
-                                <td>
-                                  <strong className="metadata-rates">
-                                    {["create", "stat", "remove"]
-                                      .map((op) =>
-                                        format(
-                                          summaries.find(
-                                            (s) => s.operation === op,
-                                          )?.median,
-                                          "ops/s",
-                                        ),
-                                      )
-                                      .join(" / ")}
-                                  </strong>
-                                  <span>延迟未采集</span>
-                                </td>
-                              </>
-                            )}
-                            <td>
-                              <Badge status={r.status} />
-                              <span>
-                                {r.plan.spec.repeats} 次重复 · {r.source}
-                              </span>
-                            </td>
-                            <td>
-                              {isBaseline ? (
-                                <span className="baseline-tag">
-                                  <ShieldCheck size={13} />
-                                  基线
-                                </span>
-                              ) : (
-                                <button
-                                  className="text-button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setCandidate(r.id);
-                                    setPage("trends");
-                                  }}
-                                >
-                                  加入对比
-                                </button>
-                              )}
-                            </td>
-                            <td>
-                              <button
-                                className="icon-button"
-                                aria-label={`查看运行 ${r.id}`}
-                              >
-                                <ChevronRight size={17} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <RunCatalog
+                  runs={visible}
+                  allRuns={runs}
+                  baselines={baselines}
+                  view={catalogView}
+                  filtered={Boolean(
+                    env ||
+                    version ||
+                    from ||
+                    to ||
+                    operation ||
+                    fileSize ||
+                    blockSize ||
+                    search,
+                  )}
+                  onOpen={showRun}
+                />
               )}
               <div className="panel-foot">
                 <Leaf size={14} />
@@ -1031,71 +974,22 @@ export function App() {
             </section>
           )}
           {page === "versions" && (
-            <section className="panel">
-              <PanelTitle
-                title="软件版本登记"
-                subtitle="同一 ID 的内容不可覆盖；更新构建时请登记新版本。"
-              />
-              {versions.length === 0 ? (
-                <Empty
-                  title="还没有登记版本"
-                  text="登记文件系统、版本标签、commit 和构建身份。"
-                />
-              ) : (
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>文件系统 / 版本</th>
-                        <th>版本 ID</th>
-                        <th>Commit</th>
-                        <th>Build / Image</th>
-                        <th>筛选内测试</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {versions.map((v) => (
-                        <tr key={v.id}>
-                          <td>
-                            <strong>{v.label}</strong>
-                            <span>{v.filesystem}</span>
-                          </td>
-                          <td className="mono">{v.id}</td>
-                          <td className="mono">{v.commit || "未登记"}</td>
-                          <td className="mono wrap">{v.build || "未登记"}</td>
-                          <td>
-                            {
-                              runs.filter((r) => r.plan.version.id === v.id)
-                                .length
-                            }{" "}
-                            次
-                          </td>
-                          <td>
-                            <button
-                              className="text-button"
-                              onClick={() => {
-                                setVersion(v.id);
-                                setPage("baselines");
-                              }}
-                            >
-                              查看测试 <ArrowRight size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
+            <Versions
+              versions={versions}
+              detail={detail}
+              onDetail={setDetail}
+              onRun={showRun}
+            />
           )}
           {page === "environments" && (
             <HardwareEnvironments
               groups={hardwareGroups}
+              detail={detail}
+              onDetail={setDetail}
+              onRun={showRun}
               onSelectSnapshot={(id) => {
                 chooseEnvironment(id);
-                setPage("baselines");
+                setPage("runs");
               }}
             />
           )}
@@ -1139,6 +1033,34 @@ export function App() {
                     ))}
                   </Select>
                 </div>
+                <div className="record-grid">
+                  {[
+                    [baseline, "基线测试"],
+                    [candidate, "候选测试"],
+                  ].map(([id, label]) => {
+                    const run = runs.find((r) => r.id === id);
+                    return run ? (
+                      <RecordCard
+                        key={label}
+                        title={`${label} · ${run.plan.version.label}`}
+                        subtitle={<Badge status={run.status} />}
+                        onOpen={() => showRun(run.id)}
+                      >
+                        <Facts
+                          items={[
+                            ["测试负载", run.plan.spec.name],
+                            ["时间", date(run.created_at)],
+                            [
+                              "云环境",
+                              run.plan.environment.provider ||
+                                run.plan.environment.kind,
+                            ],
+                          ]}
+                        />
+                      </RecordCard>
+                    ) : null;
+                  })}
+                </div>
                 {compareError && (
                   <div className="alert error">{compareError}</div>
                 )}
@@ -1166,73 +1088,92 @@ export function App() {
                       </p>
                     ))}
                     {comparison.comparable && (
-                      <div className="table-scroll">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>指标 / 并发</th>
-                              <th>基线中位数</th>
-                              <th>候选中位数</th>
-                              <th>数值变化</th>
-                              <th>候选 Min – Max</th>
-                              <th>重复</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {comparison.metrics.map((m) => (
-                              <tr key={m.baseline.key}>
-                                <td>
-                                  <strong>
-                                    {m.baseline.stage_id && (
-                                      <small>
-                                        {m.baseline.stage_id} /{" "}
-                                        {m.baseline.workload_id}
-                                        <br />
-                                      </small>
-                                    )}
-                                    {m.baseline.operation} ·{" "}
-                                    {metricLabel[m.baseline.metric]}
-                                  </strong>
-                                  <span>
-                                    {m.baseline.numjobs} jobs × depth{" "}
-                                    {m.baseline.iodepth}
-                                  </span>
-                                </td>
-                                <td>
-                                  {format(m.baseline.median, m.baseline.unit)}
-                                </td>
-                                <td>
-                                  <strong>
-                                    {format(
-                                      m.candidate.median,
-                                      m.candidate.unit,
-                                    )}
-                                  </strong>
-                                </td>
-                                <td>
-                                  <span
-                                    className={`delta ${m.percent === null ? "" : m.percent >= 0 === (m.direction === "higher-is-better") ? "good" : "bad"}`}
-                                  >
-                                    {m.percent === null
-                                      ? "零基线 / 无百分比"
-                                      : `${m.percent > 0 ? "+" : ""}${m.percent.toFixed(2)}%`}
-                                  </span>
-                                  <span>
-                                    {m.direction === "lower-is-better"
-                                      ? "越低越好"
-                                      : "越高越好"}
-                                  </span>
-                                </td>
-                                <td>
-                                  {format(m.candidate.min, m.candidate.unit)} –{" "}
-                                  {format(m.candidate.max, m.candidate.unit)}
-                                </td>
-                                <td>{m.candidate.count} 次</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="comparison-summary">
+                        <Facts
+                          items={comparison.metrics
+                            .slice(0, 3)
+                            .map((m) => [
+                              `${m.baseline.operation} · ${metricLabel[m.baseline.metric] || m.baseline.metric} · ${m.baseline.numjobs}j / ${m.baseline.iodepth}d`,
+                              `${format(m.baseline.median, m.baseline.unit)} → ${format(m.candidate.median, m.candidate.unit)}（${m.percent === null ? "无百分比" : `${m.percent.toFixed(2)}%`}）`,
+                            ])}
+                        />
+                        <p className="muted">
+                          概览展示前 3 项，展开下方查看全部指标。
+                        </p>
                       </div>
+                    )}
+                    {comparison.comparable && (
+                      <details className="comparison-metrics">
+                        <summary>指标对照详情</summary>
+                        <div className="table-scroll">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>指标 / 并发</th>
+                                <th>基线中位数</th>
+                                <th>候选中位数</th>
+                                <th>数值变化</th>
+                                <th>候选 Min – Max</th>
+                                <th>重复</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {comparison.metrics.map((m) => (
+                                <tr key={m.baseline.key}>
+                                  <td>
+                                    <strong>
+                                      {m.baseline.stage_id && (
+                                        <small>
+                                          {m.baseline.stage_id} /{" "}
+                                          {m.baseline.workload_id}
+                                          <br />
+                                        </small>
+                                      )}
+                                      {m.baseline.operation} ·{" "}
+                                      {metricLabel[m.baseline.metric]}
+                                    </strong>
+                                    <span>
+                                      {m.baseline.numjobs} jobs × depth{" "}
+                                      {m.baseline.iodepth}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {format(m.baseline.median, m.baseline.unit)}
+                                  </td>
+                                  <td>
+                                    <strong>
+                                      {format(
+                                        m.candidate.median,
+                                        m.candidate.unit,
+                                      )}
+                                    </strong>
+                                  </td>
+                                  <td>
+                                    <span
+                                      className={`delta ${m.percent === null ? "" : m.percent >= 0 === (m.direction === "higher-is-better") ? "good" : "bad"}`}
+                                    >
+                                      {m.percent === null
+                                        ? "零基线 / 无百分比"
+                                        : `${m.percent > 0 ? "+" : ""}${m.percent.toFixed(2)}%`}
+                                    </span>
+                                    <span>
+                                      {m.direction === "lower-is-better"
+                                        ? "越低越好"
+                                        : "越高越好"}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {format(m.candidate.min, m.candidate.unit)}{" "}
+                                    –{" "}
+                                    {format(m.candidate.max, m.candidate.unit)}
+                                  </td>
+                                  <td>{m.candidate.count} 次</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
                     )}
                   </div>
                 )}
@@ -1284,24 +1225,40 @@ export function App() {
               )}
             </>
           )}
-          {selected && (page === "baselines" || page === "runs") && (
+          {detail && page === "baselines" && (
+            <BackToList
+              label={catalogView === "saved" ? "返回已设基线" : "返回全部测试"}
+              onClick={() => {
+                setDetail("");
+                setSelected(null);
+              }}
+            />
+          )}
+          {detail && page === "baselines" && detailLoading && !selected && (
+            <p>正在加载测试详情…</p>
+          )}
+          {detail && selected && page === "baselines" && (
             <section className="panel run-detail">
               <div className="panel-top">
                 <div>
                   <div className="eyebrow">RUN DETAIL</div>
                   <h2>{selected.plan.spec.name}</h2>
-                  <p className="mono muted">{selected.id}</p>
+                  <p className="muted">
+                    {date(selected.created_at)} · {selected.plan.version.label}
+                  </p>
                   {selected.case_ref && (
                     <p className="muted">
-                      用例 {selected.case_ref.id} · v
-                      {selected.case_ref.revision}
+                      用例修订 v{selected.case_ref.revision}
                     </p>
                   )}
                 </div>
                 <button
                   className="icon-button"
                   aria-label="关闭运行详情"
-                  onClick={() => setSelected(null)}
+                  onClick={() => {
+                    setDetail("");
+                    setSelected(null);
+                  }}
                 >
                   <X size={20} />
                 </button>
@@ -1375,33 +1332,54 @@ export function App() {
                   value={selected.request_id || "离线导入"}
                 />
               </div>
+              <details className="technical-info">
+                <summary>测试负载参数</summary>
+                <WorkloadFacts plan={selected.plan} />
+              </details>
               <RunMetrics run={selected} />
-              <div className="detail-bottom">
-                <details>
-                  <summary>执行 Attempt 与集群状态</summary>
-                  <pre>{JSON.stringify(selected.attempt, null, 2)}</pre>
-                </details>
-                <details>
-                  <summary>完整执行计划与不可变快照</summary>
-                  <pre>{JSON.stringify(selected.plan, null, 2)}</pre>
-                </details>
-                <button
-                  className="secondary"
-                  onClick={async () => {
-                    try {
-                      setLogs(await api(`/runs/${selected.id}/logs`));
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  <Terminal size={15} />
-                  读取日志
-                </button>
-              </div>
-              {logs !== null && (
-                <pre className="logs">{JSON.stringify(logs, null, 2)}</pre>
-              )}
+              <button
+                className="secondary"
+                onClick={() => {
+                  setCandidate(selected.id);
+                  setPage("trends");
+                }}
+              >
+                与其他测试对比
+              </button>
+              <TechnicalInfo
+                value={{
+                  run_id: selected.id,
+                  request_id: selected.request_id,
+                  case_ref: selected.case_ref,
+                }}
+              >
+                <div className="detail-bottom">
+                  <details>
+                    <summary>执行 Attempt 与集群状态</summary>
+                    <pre>{JSON.stringify(selected.attempt, null, 2)}</pre>
+                  </details>
+                  <details>
+                    <summary>完整执行计划与不可变快照</summary>
+                    <pre>{JSON.stringify(selected.plan, null, 2)}</pre>
+                  </details>
+                  <button
+                    className="secondary"
+                    onClick={async () => {
+                      try {
+                        setLogs(await api(`/runs/${selected.id}/logs`));
+                      } catch (e) {
+                        setError((e as Error).message);
+                      }
+                    }}
+                  >
+                    <Terminal size={15} />
+                    读取日志
+                  </button>
+                </div>
+                {logs !== null && (
+                  <pre className="logs">{JSON.stringify(logs, null, 2)}</pre>
+                )}
+              </TechnicalInfo>
             </section>
           )}
           <footer className="page-footer">
