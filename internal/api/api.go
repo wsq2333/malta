@@ -58,10 +58,17 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	}
 	return nil
 }
-func Handler(m *service.Manager, token string, frontend http.Handler) http.Handler {
+
+type Options struct {
+	AllowUnauthenticated bool
+}
+
+func Handler(m *service.Manager, token string, frontend http.Handler, options ...Options) http.Handler {
+	allowUnauthenticated := len(options) > 0 && options[0].AllowUnauthenticated
 	mux := http.NewServeMux()
 	s := m.Store
 	caseRoutes(mux, s)
+	issueRoutes(mux, s)
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		send(w, 200, map[string]string{"status": "ok", "version": domain.Version}, nil)
 	})
@@ -277,7 +284,7 @@ func Handler(m *service.Manager, token string, frontend http.Handler) http.Handl
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			if token == "" {
+			if token == "" && !allowUnauthenticated {
 				host, _, e := net.SplitHostPort(r.Host)
 				if e != nil {
 					host = r.Host

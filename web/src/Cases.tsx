@@ -126,11 +126,13 @@ export function Cases({
   createSignal,
   runs,
   onStart,
+  canStart,
 }: {
   tick: number;
   createSignal: number;
   runs: Run[];
   onStart: (v: CaseVersion) => void;
+  canStart: boolean;
 }) {
   const [cases, setCases] = useState<TestCase[]>([]),
     [history, setHistory] = useState<CaseVersion[]>([]),
@@ -377,7 +379,11 @@ export function Cases({
                 <Download size={15} />
                 导出 JSON
               </button>
-              <button className="primary" onClick={() => onStart(selected)}>
+              <button
+                className="primary"
+                disabled={!canStart}
+                onClick={() => onStart(selected)}
+              >
                 <Play size={15} />
                 使用此版本测试
               </button>

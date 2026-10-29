@@ -14,6 +14,8 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sun,
+  Moon,
   Server,
   Settings2,
   ShieldCheck,
@@ -21,6 +23,9 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { Issues } from "./Issues";
+import { HardwareEnvironments } from "./HardwareEnvironments";
+import { groupHardware, hardwareLabel } from "./hardware";
 import { Guide } from "./Guide";
 import { Chart } from "./LazyChart";
 import { Cases, CasePicker, type CaseVersion } from "./Cases";
@@ -57,6 +62,7 @@ import {
 type Page =
   | "guide"
   | "cases"
+  | "issues"
   | "baselines"
   | "runs"
   | "versions"
@@ -71,6 +77,12 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
       icon: Layers3,
     },
     { id: "runs", label: "测试运行", en: "Benchmark runs", icon: Activity },
+    {
+      id: "issues",
+      label: "问题管理",
+      en: "Issue tracking",
+      icon: ShieldCheck,
+    },
     { id: "cases", label: "用例管理", en: "Benchmark cases", icon: Layers3 },
     {
       id: "versions",
@@ -93,6 +105,17 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
     { id: "guide", label: "使用指南", en: "User guide", icon: BookOpen },
   ];
 export function App() {
+  const [theme, setTheme] = useState(
+    document.documentElement.dataset.theme || "dark",
+  );
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem("malta-theme", theme);
+    } catch {
+      /* Storage can be disabled. */
+    }
+  }, [theme]);
   const initial = new URLSearchParams(location.search);
   const [page, setPage] = useState<Page>(
     pages.find((p) => p.id === initial.get("page"))?.id || "baselines",
@@ -129,9 +152,11 @@ export function App() {
     [requestId, setRequestId] = useState(""),
     [executor, setExecutor] = useState("local"),
     [executors, setExecutors] = useState<string[]>([]),
+    [managementOnly, setManagementOnly] = useState(false),
     [baselineName, setBaselineName] = useState(""),
     [modalError, setModalError] = useState(""),
     [logs, setLogs] = useState<unknown>(null);
+  const [issueCreate, setIssueCreate] = useState(0);
   const [caseCreate, setCaseCreate] = useState(0),
     [chosenCase, setChosenCase] = useState<CaseVersion | null>(null),
     [startMode, setStartMode] = useState("json");
@@ -167,6 +192,10 @@ export function App() {
     baseline,
     candidate,
   ]);
+  const hardwareGroups = useMemo(
+    () => groupHardware(environments),
+    [environments],
+  );
   useEffect(() => {
     let valid = true;
     setLoading(true);
@@ -183,7 +212,9 @@ export function App() {
       api<Environment[]>("/environments"),
       api<Version[]>("/versions"),
       api<Baseline[]>("/baselines"),
-      api<{ executors: string[] }>("/capabilities"),
+      api<{ executors: string[]; features: { management_only?: boolean } }>(
+        "/capabilities",
+      ),
     ])
       .then(([r, e, v, b, caps]) => {
         if (valid) {
@@ -192,6 +223,7 @@ export function App() {
           setVersions(v);
           setBaselines(b);
           setExecutors(caps.executors);
+          setManagementOnly(caps.features.management_only === true);
           setExecutor((old) =>
             caps.executors.includes(old) ? old : caps.executors[0] || "",
           );
@@ -299,6 +331,10 @@ export function App() {
     }
   };
   function openModal(name: string) {
+    if (name === "start" && !executors.length) {
+      setToast("当前服务未启用测试执行，可先管理用例与结果。");
+      return;
+    }
     setModalError("");
     setJSONInput("");
     setRequestId("");
@@ -374,7 +410,6 @@ export function App() {
           ? "μs"
           : metric?.unit || "";
     return {
-      color: ["#169d77"],
       tooltip: {
         trigger: "axis",
         valueFormatter: (v: number) => `${Number(v).toFixed(2)} ${unit}`,
@@ -385,13 +420,10 @@ export function App() {
         data: points.map(
           (p) => `${date(p.run.created_at)}\n${p.run.plan.version.label}`,
         ),
-        axisLine: { lineStyle: { color: "#dce7e0" } },
-        axisLabel: { color: "#718078" },
       },
       yAxis: {
         type: "value",
         name: unit,
-        splitLine: { lineStyle: { color: "#edf3ef" } },
       },
       series: [
         {
@@ -405,7 +437,7 @@ export function App() {
             return m ? m.median / scale : null;
           }),
           lineStyle: { width: 3 },
-          areaStyle: { color: "rgba(37,178,130,.08)" },
+          areaStyle: { opacity: 0.08 },
         },
       ],
     };
@@ -454,7 +486,11 @@ export function App() {
             <span className="connection-dot" />
             <span>
               可用执行器
-              <small>{executors.join(" / ") || "读取中"} · 串行队列</small>
+              <small>
+                {managementOnly
+                  ? "仅管理服务 · 测试未启用"
+                  : executors.join(" / ") || "读取中"}
+              </small>
             </span>
             <Settings2 size={16} />
           </button>
@@ -476,6 +512,14 @@ export function App() {
               onClick={refresh}
             >
               <RefreshCw size={17} className={loading ? "spin" : ""} />
+            </button>
+            <button
+              className="icon-button theme-toggle"
+              aria-label={theme === "dark" ? "切换浅色主题" : "切换深色主题"}
+              title={theme === "dark" ? "切换浅色主题" : "切换深色主题"}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
             </button>
             <button
               className="avatar"
@@ -500,47 +544,68 @@ export function App() {
               <p>
                 {page === "guide"
                   ? "从填写 JSON 到发起测试，逐步建立可靠的性能对照。"
-                  : page === "cases"
-                    ? "保存测试定义，以不可变版本组织每一次实验。"
-                    : page === "baselines"
-                      ? "让每一次性能变化，都有可靠的参照。"
-                      : page === "runs"
-                        ? "管理测试生命周期，追溯每一份原始证据。"
-                        : page === "versions"
-                          ? "以不可变的版本身份，串联每一次测试。"
-                          : page === "environments"
-                            ? "记录云实例与物理硬件，固定公平对照的条件。"
-                            : "在相同测试条件下，观察版本与时间带来的变化。"}
+                  : page === "issues"
+                    ? "记录测试问题、追溯调查过程与解决方式。"
+                    : page === "cases"
+                      ? "保存测试定义，以不可变版本组织每一次实验。"
+                      : page === "baselines"
+                        ? "让每一次性能变化，都有可靠的参照。"
+                        : page === "runs"
+                          ? "管理测试生命周期，追溯每一份原始证据。"
+                          : page === "versions"
+                            ? "以不可变的版本身份，串联每一次测试。"
+                            : page === "environments"
+                              ? "按云环境与各角色机型归组，在执行快照中保留具体测试条件。"
+                              : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
             <button
               className="primary"
+              disabled={
+                !executors.length &&
+                ![
+                  "guide",
+                  "issues",
+                  "cases",
+                  "versions",
+                  "environments",
+                ].includes(page)
+              }
               onClick={() =>
                 page === "guide"
                   ? setPage("cases")
-                  : page === "cases"
-                    ? setCaseCreate((n) => n + 1)
-                    : openModal(
-                        page === "versions"
-                          ? "version"
-                          : page === "environments"
-                            ? "environment"
-                            : "start",
-                      )
+                  : page === "issues"
+                    ? setIssueCreate((n) => n + 1)
+                    : page === "cases"
+                      ? setCaseCreate((n) => n + 1)
+                      : openModal(
+                          page === "versions"
+                            ? "version"
+                            : page === "environments"
+                              ? "environment"
+                              : "start",
+                        )
               }
             >
               <Plus size={17} />
               {page === "guide"
                 ? "前往用例管理"
-                : page === "cases"
-                  ? "新建用例"
-                  : page === "versions"
-                    ? "登记版本"
-                    : page === "environments"
-                      ? "登记环境"
-                      : "发起测试"}
+                : page === "issues"
+                  ? "登记问题"
+                  : page === "cases"
+                    ? "新建用例"
+                    : page === "versions"
+                      ? "登记版本"
+                      : page === "environments"
+                        ? "登记执行快照"
+                        : "发起测试"}
             </button>
           </header>
+          {managementOnly && (
+            <div className="alert">
+              当前为仅管理服务：可管理问题、用例、版本、环境与已有结果；测试执行尚未启用。
+            </div>
+          )}
           {error && page !== "guide" && (
             <div className="alert error" role="alert">
               {error}
@@ -549,7 +614,10 @@ export function App() {
             </div>
           )}
           {page === "guide" && <Guide onNavigate={setPage} />}
-          {page !== "cases" && page !== "guide" && (
+          {page === "issues" && (
+            <Issues tick={tick} createSignal={issueCreate} />
+          )}
+          {page !== "issues" && page !== "cases" && page !== "guide" && (
             <>
               <section className="stats">
                 <Stat
@@ -567,8 +635,8 @@ export function App() {
                 <Stat
                   icon={Server}
                   label="硬件环境"
-                  value={environments.length}
-                  note="不可变配置快照"
+                  value={hardwareGroups.length}
+                  note={`${environments.length} 份执行快照`}
                 />
                 <Stat
                   icon={Activity}
@@ -582,15 +650,19 @@ export function App() {
                   <Settings2 size={16} /> 实验条件
                 </div>
                 <Select
-                  label="硬件环境"
+                  label="执行快照"
                   value={env}
                   onChange={chooseEnvironment}
                 >
-                  <option value="">全部环境</option>
-                  {environments.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name} · {e.kind}
-                    </option>
+                  <option value="">全部执行快照</option>
+                  {hardwareGroups.map((group) => (
+                    <optgroup key={group.key} label={hardwareLabel(group)}>
+                      {group.snapshots.map((snapshot) => (
+                        <option key={snapshot.id} value={snapshot.id}>
+                          {snapshot.name} · {snapshot.id}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </Select>
                 <Select
@@ -637,6 +709,7 @@ export function App() {
               tick={tick}
               createSignal={caseCreate}
               runs={runs}
+              canStart={executors.length > 0}
               onStart={(v) => {
                 openModal("start");
                 setStartMode("case");
@@ -1018,63 +1091,13 @@ export function App() {
             </section>
           )}
           {page === "environments" && (
-            <div className="environment-grid">
-              {environments.length === 0 ? (
-                <section className="panel">
-                  <Empty
-                    title="还没有硬件环境"
-                    text="记录云环境与实例类型，或物理机器型号及客户端 / 服务端拓扑。"
-                  />
-                </section>
-              ) : (
-                environments.map((e) => (
-                  <section className="panel environment-card" key={e.id}>
-                    <header>
-                      <span className="environment-icon">
-                        <Server size={22} />
-                      </span>
-                      <span className="pill">{e.kind}</span>
-                    </header>
-                    <h2>{e.name}</h2>
-                    <p className="mono muted">{e.id}</p>
-                    <div className="environment-location">
-                      {[e.provider, e.region].filter(Boolean).join(" / ") ||
-                        "未登记云区域"}
-                      <span>{e.os || "OS 未登记"}</span>
-                    </div>
-                    {e.machines.map((m, i) => (
-                      <div className="machine" key={i}>
-                        <div>
-                          <strong>{m.role}</strong>
-                          <span>{m.count} 台</span>
-                        </div>
-                        <b>{m.model}</b>
-                        <p>
-                          {m.cpu} ·{" "}
-                          {m.memory_bytes ? size(m.memory_bytes) : "内存未登记"}
-                        </p>
-                        <p>
-                          {m.storage} · {m.network}
-                        </p>
-                      </div>
-                    ))}
-                    <details>
-                      <summary>配置快照</summary>
-                      <pre>{JSON.stringify(e.config, null, 2)}</pre>
-                    </details>
-                    <button
-                      className="secondary full"
-                      onClick={() => {
-                        chooseEnvironment(e.id);
-                        setPage("baselines");
-                      }}
-                    >
-                      查看环境基线 <ArrowRight size={15} />
-                    </button>
-                  </section>
-                ))
-              )}
-            </div>
+            <HardwareEnvironments
+              groups={hardwareGroups}
+              onSelectSnapshot={(id) => {
+                chooseEnvironment(id);
+                setPage("baselines");
+              }}
+            />
           )}
           {page === "trends" && (
             <>

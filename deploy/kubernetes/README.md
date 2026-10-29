@@ -93,3 +93,10 @@ retained for explicit cleanup; record retention is not automated in v0.1.
 Actual tested combinations and limitations are tracked in
 [the validation record](../../docs/validation-s5-s7.md). No production CSI support
 is implied by the functional test fixture.
+
+For the real sample dev Curvine rollout, see
+[deployment and acceptance findings](../../docs/validation-sample-dev.md).
+That rollout exposed a regular-file ownership issue: a storage preflight must
+verify the UID/GID of a newly created file **after closing and reopening it**, in
+addition to mkdir/rename and cross-node result sharing. Successful scheduling and
+result collection alone do not establish a valid performance baseline.

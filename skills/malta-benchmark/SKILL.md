@@ -50,6 +50,8 @@ requested or required by the agreed execution budget. Confirm terminal state.
 Kubernetes service restarts retain Job/Attempt identity; local interrupted runs
 require inspection before a separately authorized experiment.
 
+For user-authorized issue tracking, read [issue workflow](references/issues.md).
+
 ## Compare and report
 
 Only treat a successful run with `attempt.result_state=complete` as a complete

@@ -9,6 +9,10 @@ import (
 
 func TestSchemaExamples(t *testing.T) {
 	p := FixturePlan(t)
+	var issue SaveIssue
+	if err := Read("../../web/src/issue-example.json", &issue); err != nil {
+		t.Fatal(err)
+	}
 	raw, e := os.ReadFile("../../benchmarks/scenarios/mixed-data.yaml")
 	if e != nil {
 		t.Fatal(e)
@@ -20,7 +24,7 @@ func TestSchemaExamples(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		v    any
-	}{{"spec", p.Spec}, {"environment", p.Environment}, {"version", p.Version}, {"plan", p}, {"scenario", source}} {
+	}{{"save-issue", issue}, {"issue", Issue{IssueID: issue.IssueID, Revision: 1, IssueFields: issue.IssueFields, CreatedAt: issue.OccurredAt, UpdatedAt: issue.OccurredAt}}, {"spec", p.Spec}, {"environment", p.Environment}, {"version", p.Version}, {"plan", p}, {"scenario", source}} {
 		t.Run(tt.name, func(t *testing.T) {
 			b, err := os.ReadFile("../../schemas/" + tt.name + ".json")
 			if err != nil {

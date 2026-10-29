@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://malta.local/schemas/save-issue.json",
+  "$ref": "#/$defs/SaveIssue",
+  "$defs": {
+    "SaveIssue": {
+      "properties": {
+        "issue_id": {
+          "type": "string"
+        },
+        "base_revision": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "software": {
+          "type": "string"
+        },
+        "hardware": {
+          "type": "string"
+        },
+        "version_id": {
+          "type": "string"
+        },
+        "environment_id": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "reporter": {
+          "type": "string"
+        },
+        "change_note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "issue_id",
+        "base_revision",
+        "title",
+        "type",
+        "description",
+        "software",
+        "hardware",
+        "occurred_at",
+        "resolved",
+        "resolution",
+        "reporter",
+        "change_note"
+      ]
+    }
+  }
+}

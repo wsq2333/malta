@@ -17,11 +17,12 @@ import (
 )
 
 type Config struct {
-	Kubernetes   *kube.Executor
-	AllowedRoots []string
-	Fio          string
-	MaxBytes     int64
-	Timeout      time.Duration
+	ManagementOnly bool
+	Kubernetes     *kube.Executor
+	AllowedRoots   []string
+	Fio            string
+	MaxBytes       int64
+	Timeout        time.Duration
 }
 type Manager struct {
 	Store  *store.Store
@@ -43,7 +44,10 @@ type StartRequest struct {
 }
 
 func New(s *store.Store, c Config) (*Manager, error) {
-	if len(c.AllowedRoots) == 0 && c.Kubernetes == nil {
+	if c.ManagementOnly && (len(c.AllowedRoots) > 0 || c.Kubernetes != nil) {
+		return nil, domain.E("invalid", "management-only cannot configure execution backends")
+	}
+	if !c.ManagementOnly && len(c.AllowedRoots) == 0 && c.Kubernetes == nil {
 		return nil, domain.E("invalid", "at least one --allow-target is required")
 	}
 	if c.MaxBytes <= 0 || c.Timeout <= 0 {
@@ -67,9 +71,11 @@ func New(s *store.Store, c Config) (*Manager, error) {
 	if e != nil {
 		return nil, e
 	}
-	if e = s.Recover(); e != nil {
-		unlock()
-		return nil, e
+	if !c.ManagementOnly {
+		if e = s.Recover(); e != nil {
+			unlock()
+			return nil, e
+		}
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	m := &Manager{Store: s, Config: c, ctx: ctx, stop: stop, done: make(chan struct{}), unlock: unlock}
@@ -78,6 +84,9 @@ func New(s *store.Store, c Config) (*Manager, error) {
 }
 func (m *Manager) Validate(p domain.Plan) error { return m.validate(p, "local") }
 func (m *Manager) validate(p domain.Plan, executor string) error {
+	if m.Config.ManagementOnly {
+		return domain.E("unsupported", "run execution is disabled in management-only mode")
+	}
 	if e := p.Validate(); e != nil {
 		return e
 	}
@@ -118,6 +127,9 @@ func (m *Manager) validate(p domain.Plan, executor string) error {
 	return nil
 }
 func (m *Manager) Start(q StartRequest) (domain.Run, error) {
+	if m.Config.ManagementOnly {
+		return domain.Run{}, domain.E("unsupported", "run execution is disabled in management-only mode")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.ctx.Err() != nil {
@@ -162,6 +174,9 @@ func (m *Manager) Start(q StartRequest) (domain.Run, error) {
 	return m.Store.CreateManagedFromCase(q.Plan, q.RequestID, q.Source, q.Executor, q.CaseRef)
 }
 func (m *Manager) Cancel(id string) (domain.Run, error) {
+	if m.Config.ManagementOnly {
+		return domain.Run{}, domain.E("unsupported", "run cancellation is disabled in management-only mode")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	r, e := m.Store.Run(id)
@@ -194,6 +209,10 @@ func (m *Manager) Cancel(id string) (domain.Run, error) {
 func (m *Manager) Close() { m.stop(); <-m.done; m.unlock() }
 func (m *Manager) loop() {
 	defer close(m.done)
+	if m.Config.ManagementOnly {
+		<-m.ctx.Done()
+		return
+	}
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {

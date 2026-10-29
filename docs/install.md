@@ -64,7 +64,10 @@ by digest. Use the renderer and server-side dry-run before applying manifests.
 The server is single replica, Recreate deployment; the SQLite directory is never
 placed on the benchmark PVC. Do not run multiple servers against one database.
 
-`MALTA_TOKEN` is required when listening beyond loopback. Provide TLS through your
+`MALTA_TOKEN` is required by default when listening beyond loopback.
+An explicitly trusted private deployment may opt in with `--allow-unauthenticated`.
+For UI/API without execution, use `--management-only` (mutually exclusive with
+local targets and Kubernetes config); see [the management-only profile](../deploy/kubernetes/overlays/management/README.md). Provide TLS through your
 existing ingress/reverse proxy or use port-forward/SSH. v0.1 has one shared token,
 not tenant-level authorization. Runner has no service-account token or host mounts.
 
