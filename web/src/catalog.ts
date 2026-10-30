@@ -6,9 +6,9 @@ export function catalogRoute(params: URLSearchParams) {
         ? "baselines"
         : params.get("page") || "baselines",
     view:
-      params.get("page") === "runs" || params.get("view") === "all"
-        ? "all"
-        : "saved",
+      params.get("page") !== "runs" && params.get("view") === "saved"
+        ? "saved"
+        : "all",
   };
 }
 export function baselineEntries(

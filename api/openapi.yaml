@@ -11,6 +11,59 @@ servers:
 security:
 - bearerAuth: []
 paths:
+  /run-catalog:
+    get:
+      description: >-
+        Full-history catalog within selected snapshots. Overview groups by project;
+        conditions groups by exact test conditions; history pages run summaries.
+        Counts and representatives use one read transaction, without the /runs 500-row cap.
+        No implicit baseline comparison. See docs/performance-catalog.md.
+      parameters:
+      - {in: query, name: mode, schema: {type: string, enum: [overview, conditions, history], default: overview}}
+      - {in: query, name: project, schema: {type: string}, description: Required in conditions mode.}
+      - {in: query, name: condition, schema: {type: string}, description: Requires project.}
+      - in: query
+        name: environment
+        style: form
+        explode: true
+        schema: {type: array, maxItems: 1000, items: {type: string}}
+      - {in: query, name: version, schema: {type: string}}
+      - {in: query, name: kind, schema: {type: string, enum: [data, metadata, scenario]}}
+      - {in: query, name: status, schema: {type: string, enum: [pending, queued, preparing, running, cancelling, succeeded, failed, cancelled, interrupted]}}
+      - {in: query, name: from, schema: {type: string, format: date-time}}
+      - {in: query, name: to, schema: {type: string, format: date-time}}
+      - {in: query, name: operation, schema: {type: string, enum: [read, write, randread, randwrite, rw, randrw]}}
+      - {in: query, name: file_size, schema: {type: integer, minimum: 0}}
+      - {in: query, name: block_size, schema: {type: integer, minimum: 0}}
+      - {in: query, name: search, schema: {type: string}, description: At most 200 UTF-8 bytes.}
+      - {in: query, name: saved, schema: {type: boolean, default: false}}
+      - {in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      - {in: query, name: offset, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: Paginated groups or run summaries with full matching counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version: {const: '1.0'}
+                  data:
+                    type: object
+                    required: [mode, total, run_count, succeeded, active, saved, limit, offset, groups, runs]
+                    properties:
+                      mode: {type: string}
+                      total: {type: integer}
+                      run_count: {type: integer}
+                      succeeded: {type: integer}
+                      active: {type: integer}
+                      saved: {type: integer}
+                      limit: {type: integer}
+                      offset: {type: integer}
+                      groups: {type: array, items: {type: object}}
+                      runs: {type: array, items: {type: object}}
+        '400': {description: Invalid filters or pagination}
+        '401': {description: Authentication required}
   /issues:
     get:
       description: All latest issue revisions, newest update first. Available in management-only mode.
