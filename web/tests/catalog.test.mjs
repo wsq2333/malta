@@ -2,14 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { catalogRoute, baselineEntries } from "../src/catalog.ts";
 
-test("legacy run links resolve to all tests, while the baseline landing defaults to saved", () => {
+test("legacy run links resolve to all tests, while the landing defaults to all", () => {
   assert.deepEqual(catalogRoute(new URLSearchParams("page=runs&view=saved")), {
     page: "baselines",
     view: "all",
   });
   assert.deepEqual(catalogRoute(new URLSearchParams("page=baselines")), {
     page: "baselines",
-    view: "saved",
+    view: "all",
   });
   assert.equal(
     catalogRoute(new URLSearchParams("page=baselines&view=all")).view,

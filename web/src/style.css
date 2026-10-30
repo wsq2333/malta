@@ -2262,3 +2262,138 @@ td strong {
     padding: 16px;
   }
 }
+
+.catalog-scope {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.catalog-scope label,
+.catalog-extra label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+}
+.catalog-scope select,
+.catalog-extra select {
+  width: 100%;
+}
+.catalog-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0;
+}
+.catalog-controls > input {
+  flex: 1;
+  min-width: 160px;
+}
+.catalog-controls summary {
+  cursor: pointer;
+  padding: 8px;
+}
+.catalog-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  max-width: 100%;
+}
+.catalog-extra label:first-child {
+  max-width: 440px;
+}
+.catalog-context,
+.catalog-selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+.catalog-context span {
+  color: var(--text-muted);
+}
+.catalog-selection {
+  padding: 12px;
+  background: var(--accent-bg);
+  border-radius: 8px;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.catalog-table {
+  width: 100%;
+  min-width: 680px;
+}
+.catalog-table th {
+  white-space: nowrap;
+}
+.catalog-table td {
+  vertical-align: top;
+  padding: 18px 16px;
+}
+.catalog-table small,
+.metric-link small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.catalog-table strong {
+  font-weight: 600;
+}
+.metric-link {
+  display: block;
+  text-align: left;
+  padding: 0;
+}
+.metric-link strong {
+  color: var(--text);
+}
+.metric-link:hover strong,
+.text-action:hover {
+  text-decoration: underline;
+}
+.text-action {
+  color: var(--accent);
+  padding: 8px 0 0;
+  font-size: 12px;
+}
+.catalog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 0;
+  flex-wrap: wrap;
+}
+.catalog-pagination span {
+  margin-right: auto;
+  color: var(--text-muted);
+}
+.catalog-empty {
+  text-align: center;
+  padding: 40px !important;
+  color: var(--text-muted);
+}
+.catalog-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 16px 0;
+}
+@media (max-width: 850px) {
+  .catalog-scope {
+    grid-template-columns: 1fr;
+  }
+  .catalog-extra {
+    flex-direction: column;
+  }
+}

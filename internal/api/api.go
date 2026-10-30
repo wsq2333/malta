@@ -69,6 +69,7 @@ func Handler(m *service.Manager, token string, frontend http.Handler, options ..
 	s := m.Store
 	caseRoutes(mux, s)
 	issueRoutes(mux, s)
+	catalogRoutes(mux, s)
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		send(w, 200, map[string]string{"status": "ok", "version": domain.Version}, nil)
 	})

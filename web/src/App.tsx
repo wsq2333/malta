@@ -1,3 +1,4 @@
+import { PerformanceCatalog } from "./PerformanceCatalog";
 import {
   workspaceSection,
   workspaceNavigation,
@@ -29,7 +30,6 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { RunCatalog } from "./RunCatalog";
 import { Versions } from "./Versions";
 import {
   BackToList,
@@ -210,7 +210,7 @@ export function App() {
     [startMode, setStartMode] = useState("json");
   const refresh = () => setTick((t) => t + 1);
   useEffect(() => {
-    const q = new URLSearchParams();
+    const q = new URLSearchParams(location.search);
     Object.entries({
       page,
       view: catalogView,
@@ -227,6 +227,7 @@ export function App() {
       candidate,
     }).forEach(([k, v]) => {
       if (v) q.set(k, v);
+      else q.delete(k);
     });
     history.replaceState(null, "", `?${q}`);
   }, [
@@ -304,7 +305,19 @@ export function App() {
     if (to && !Number.isNaN(Date.parse(to)))
       q.set("to", new Date(to + "T23:59:59.999").toISOString());
     Promise.all([
-      api<Run[]>("/runs?" + q),
+      api<Run[]>("/runs?" + q).then(async (list) => {
+        const ids = [
+          ...new Set(
+            [baseline, candidate].filter(
+              (id) => id && !list.some((r) => r.id === id),
+            ),
+          ),
+        ];
+        const extra = await Promise.all(
+          ids.map((id) => api<Run>(`/runs/${encodeURIComponent(id)}`)),
+        );
+        return [...list, ...extra];
+      }),
       api<Environment[]>("/environments"),
       api<Version[]>("/versions"),
       api<Baseline[]>("/baselines"),
@@ -337,7 +350,7 @@ export function App() {
     return () => {
       valid = false;
     };
-  }, [tick, env, version, from, to]);
+  }, [tick, env, version, from, to, baseline, candidate]);
   useEffect(() => {
     if (
       !runs.some(
@@ -778,7 +791,7 @@ export function App() {
               setActive={setDetail}
             />
           )}
-          {!detail && (page === "baselines" || page === "trends") && (
+          {!detail && page === "trends" && (
             <>
               <div className="workspace-summary" aria-label="测试概况">
                 <span>
@@ -879,165 +892,25 @@ export function App() {
               }}
             />
           )}
-          {page === "baselines" && !detail && (
-            <section className="panel results-panel">
-              <div className="catalog-toolbar">
-                <label>
-                  显示范围{" "}
-                  <select
-                    aria-label="测试显示范围"
-                    value={catalogView}
-                    onChange={(e) => setCatalogView(e.target.value)}
-                  >
-                    <option value="all">全部测试</option>
-                    <option value="saved">已设基线</option>
-                  </select>
-                </label>
-                <span className="muted">数据 I/O、元数据与混合场景</span>
-              </div>
-              <div className="panel-top">
-                <div className="tabs">
-                  <button
-                    className={kind === "data" ? "selected" : ""}
-                    onClick={() => {
-                      setKind("data");
-                      setOperation("");
-                      setFileSize("");
-                      setBlockSize("");
-                      setSelected(null);
-                    }}
-                  >
-                    <Database size={16} />
-                    数据 I/O
-                  </button>
-                  <button
-                    className={kind === "metadata" ? "selected" : ""}
-                    onClick={() => {
-                      setKind("metadata");
-                      setOperation("");
-                      setFileSize("");
-                      setBlockSize("");
-                      setSelected(null);
-                    }}
-                  >
-                    <Layers3 size={16} />
-                    元数据
-                  </button>
-                  <button
-                    className={kind === "scenario" ? "selected" : ""}
-                    onClick={() => {
-                      setKind("scenario");
-                      setOperation("");
-                      setFileSize("");
-                      setBlockSize("");
-                      setSelected(null);
-                    }}
-                  >
-                    <Layers3 size={16} />
-                    混合场景
-                  </button>
-                </div>
-                <span className="muted">
-                  {visible.length} 次实验 · 最多加载 500 条
-                </span>
-              </div>
-              <div className="table-controls">
-                {kind === "data" && (
-                  <>
-                    <Select
-                      label="读写类型"
-                      value={operation}
-                      onChange={setOperation}
-                    >
-                      <option value="">全部类型</option>
-                      {Object.entries(operationLabel).map(([v, l]) => (
-                        <option key={v} value={v}>
-                          {l}
-                        </option>
-                      ))}
-                    </Select>
-                    <Select
-                      label="文件大小"
-                      value={fileSize}
-                      onChange={setFileSize}
-                    >
-                      <option value="">全部大小</option>
-                      {[
-                        ...new Set(
-                          scoped.map(
-                            (r) => r.plan.spec.workload.file_size_bytes,
-                          ),
-                        ),
-                      ]
-                        .sort((a, b) => a - b)
-                        .map((n) => (
-                          <option key={n} value={n}>
-                            {size(n)}
-                          </option>
-                        ))}
-                    </Select>
-                    <Select
-                      label="I/O 块大小"
-                      value={blockSize}
-                      onChange={setBlockSize}
-                    >
-                      <option value="">全部大小</option>
-                      {[
-                        ...new Set(
-                          scoped.map(
-                            (r) => r.plan.spec.workload.block_size_bytes,
-                          ),
-                        ),
-                      ]
-                        .sort((a, b) => a - b)
-                        .map((n) => (
-                          <option key={n} value={n}>
-                            {size(n)}
-                          </option>
-                        ))}
-                    </Select>
-                  </>
-                )}
-                <label className="search">
-                  <Search size={16} />
-                  <input
-                    aria-label="搜索运行"
-                    placeholder="搜索版本、负载或 Run ID"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </label>
-              </div>
-              {loading && !runs.length ? (
-                <p className="case-padding">正在加载测试…</p>
-              ) : (
-                <RunCatalog
-                  runs={visible}
-                  allRuns={runs}
-                  baselines={baselines}
-                  view={catalogView}
-                  filtered={Boolean(
-                    env ||
-                    version ||
-                    from ||
-                    to ||
-                    operation ||
-                    fileSize ||
-                    blockSize ||
-                    search,
-                  )}
-                  onOpen={showRun}
-                />
-              )}
-              <div className="panel-foot">
-                <Leaf size={14} />
-                {kind === "data"
-                  ? "最高值仅代表已测矩阵中的重复中位数峰值，不代表系统绝对极限。"
-                  : kind === "scenario"
-                    ? "混合场景按子负载分别统计；展开查看实际配比、测量时间线与独立指标。"
-                    : "元数据当前支持 mdtest 4.0.0 的文件 create、stat、remove；未采集指标保留为空。"}
-              </div>
-            </section>
+          {page === "baselines" && (
+            <div hidden={Boolean(detail)}>
+              <PerformanceCatalog
+                environments={environments}
+                versions={versions}
+                tick={tick}
+                onOpen={showRun}
+                onCompare={(a, b, selectedKind) => {
+                  setKind(selectedKind);
+                  setOperation("");
+                  setFileSize("");
+                  setBlockSize("");
+                  setSearch("");
+                  setBaseline(a);
+                  setCandidate(b);
+                  setPage("trends");
+                }}
+              />
+            </div>
           )}
           {page === "versions" && (
             <Versions
@@ -1054,6 +927,14 @@ export function App() {
               onDetail={setDetail}
               onRun={showRun}
               onSelectSnapshot={(id) => {
+                const q = new URLSearchParams(location.search);
+                ["hw", "site", "project", "condition"].forEach((k) =>
+                  q.set("catalog_" + k, ""),
+                );
+                q.set("catalog_snapshot", id);
+                q.set("catalog_offset", "0");
+                q.set("catalog_mode", "overview");
+                history.replaceState(null, "", `?${q}`);
                 chooseEnvironment(id);
                 setPage("runs");
               }}
