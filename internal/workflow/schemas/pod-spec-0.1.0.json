@@ -1,0 +1,264 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "restartPolicy": {"enum": ["Never"]},
+    "containers": {"type": "array", "items": {"$ref": "#/$defs/container"}, "minItems": 1, "maxItems": 1},
+    "initContainers": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/container"}, {"$ref": "#/$defs/sidecar"}]}, "description": "Native Pod wire format: omitted restartPolicy means ordinary init; Always means sidecar. Registration maps both to unified internal containers with role init or sidecar."},
+    "volumes": {"type": "array", "items": {"$ref": "#/$defs/volume"}},
+    "activeDeadlineSeconds": {"type": "integer", "minimum": 0, "maximum": 604800},
+    "nodeSelector": {"type": "object", "additionalProperties": {"type": "string"}},
+    "tolerations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {"type": "string"},
+          "value": {"type": "string"},
+          "operator": {"enum": ["", "Exists", "Equal"]},
+          "effect": {"enum": ["", "NoSchedule", "PreferNoSchedule", "NoExecute"]}
+        }
+      }
+    },
+    "schedulerName": {"type": "string", "maxLength": 253, "description": "Empty means unset; nonempty names must be DNS subdomains in deployment resources.allowed_scheduler_names (default: default-scheduler, volcano)."},
+    "priorityClassName": {"type": "string"}
+  },
+  "required": ["containers"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pod-spec-0.1.0.json",
+  "title": "Supported Pod v1 spec",
+  "description": "Native Pod manifest: one main container, multiple ordinary init containers and native restartable sidecars, PVC/NAS, emptyDir and ephemeral storage. Internal templates use a single containers list with init/main/sidecar roles. Unknown fields are rejected. Cross-field checks (unique names, declared volumes, reserved /inputs and /outputs mounts, quantities and scheduling rules) remain server-side semantic validation. No arbitrary Kubernetes PodSpec passthrough.",
+  "$defs": {
+    "envFromReference": {"type": "object", "additionalProperties": false, "required": ["name"], "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 253, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"}, "optional": {"type": "boolean"}}},
+    "envFromSource": {"type": "object", "additionalProperties": false, "properties": {"prefix": {"type": "string", "pattern": "^([A-Za-z_][A-Za-z0-9_]*)?$"}, "secretRef": {"$ref": "#/$defs/envFromReference"}, "configMapRef": {"$ref": "#/$defs/envFromReference"}}, "oneOf": [{"required": ["secretRef"], "not": {"required": ["configMapRef"]}}, {"required": ["configMapRef"], "not": {"required": ["secretRef"]}}]},
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "image": {"type": "string", "minLength": 1},
+        "command": {"type": "array", "items": {"type": "string"}},
+        "args": {"type": "array", "items": {"type": "string"}},
+        "envFrom": {"type": "array", "items": {"$ref": "#/$defs/envFromSource"}, "description": "Ordered native references; later sources override earlier sources, explicit env takes precedence. yarlung consumption requires a separate executor update."},
+        "env": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": {"type": "string"}},
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {"type": "string", "minLength": 1},
+                  "value": {"type": "string"},
+                  "valueFrom": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "fieldRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {"apiVersion": {"enum": ["", "v1"]}, "fieldPath": {"enum": ["metadata.name", "metadata.namespace", "spec.nodeName", "status.podIP"]}},
+                        "required": ["fieldPath"]
+                      },
+                      "secretKeyRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {"name": {"type": "string", "minLength": 1}, "key": {"type": "string", "minLength": 1}, "optional": {"type": "boolean"}},
+                        "required": ["name", "key"]
+                      },
+                      "configMapKeyRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {"name": {"type": "string", "minLength": 1}, "key": {"type": "string", "minLength": 1}, "optional": {"type": "boolean"}},
+                        "required": ["name", "key"]
+                      }
+                    },
+                    "oneOf": [{"required": ["fieldRef"]}, {"required": ["secretKeyRef"]}, {"required": ["configMapKeyRef"]}]
+                  }
+                },
+                "required": ["name"],
+                "not": {"required": ["value", "valueFrom"]}
+              }
+            }
+          ]
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {"cpu": {"type": "string"}, "memory": {"type": "string"}, "nvidia.com/gpu": {"type": "string"}, "ephemeral-storage": {"type": "string"}}
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {"cpu": {"type": "string"}, "memory": {"type": "string"}, "nvidia.com/gpu": {"type": "string"}, "ephemeral-storage": {"type": "string"}}
+            }
+          }
+        },
+        "imagePullPolicy": {"enum": ["", "Always", "IfNotPresent", "Never"]},
+        "volumeMounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {"name": {"type": "string", "minLength": 1}, "mountPath": {"type": "string", "pattern": "^/"}, "readOnly": {"type": "boolean"}},
+            "required": ["name", "mountPath"]
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {"name": {"type": "string"}, "containerPort": {"type": "integer", "minimum": 1, "maximum": 65535}, "protocol": {"enum": ["", "TCP", "UDP", "SCTP"]}},
+            "required": ["containerPort"]
+          }
+        }
+      },
+      "required": ["name", "image"]
+    },
+    "sidecar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "image": {"type": "string", "minLength": 1},
+        "command": {"type": "array", "items": {"type": "string"}},
+        "args": {"type": "array", "items": {"type": "string"}},
+        "envFrom": {"type": "array", "items": {"$ref": "#/$defs/envFromSource"}, "description": "Ordered native references; later sources override earlier sources, explicit env takes precedence. yarlung consumption requires a separate executor update."},
+        "env": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": {"type": "string"}},
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {"type": "string", "minLength": 1},
+                  "value": {"type": "string"},
+                  "valueFrom": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "fieldRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {"apiVersion": {"enum": ["", "v1"]}, "fieldPath": {"enum": ["metadata.name", "metadata.namespace", "spec.nodeName", "status.podIP"]}},
+                        "required": ["fieldPath"]
+                      },
+                      "secretKeyRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {"name": {"type": "string", "minLength": 1}, "key": {"type": "string", "minLength": 1}, "optional": {"type": "boolean"}},
+                        "required": ["name", "key"]
+                      },
+                      "configMapKeyRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {"name": {"type": "string", "minLength": 1}, "key": {"type": "string", "minLength": 1}, "optional": {"type": "boolean"}},
+                        "required": ["name", "key"]
+                      }
+                    },
+                    "oneOf": [{"required": ["fieldRef"]}, {"required": ["secretKeyRef"]}, {"required": ["configMapKeyRef"]}]
+                  }
+                },
+                "required": ["name"],
+                "not": {"required": ["value", "valueFrom"]}
+              }
+            }
+          ]
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {"cpu": {"type": "string"}, "memory": {"type": "string"}, "nvidia.com/gpu": {"type": "string"}, "ephemeral-storage": {"type": "string"}}
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {"cpu": {"type": "string"}, "memory": {"type": "string"}, "nvidia.com/gpu": {"type": "string"}, "ephemeral-storage": {"type": "string"}}
+            }
+          }
+        },
+        "imagePullPolicy": {"enum": ["", "Always", "IfNotPresent", "Never"]},
+        "volumeMounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {"name": {"type": "string", "minLength": 1}, "mountPath": {"type": "string", "pattern": "^/"}, "readOnly": {"type": "boolean"}},
+            "required": ["name", "mountPath"]
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {"name": {"type": "string"}, "containerPort": {"type": "integer", "minimum": 1, "maximum": 65535}, "protocol": {"enum": ["", "TCP", "UDP", "SCTP"]}},
+            "required": ["containerPort"]
+          }
+        },
+        "restartPolicy": {"const": "Always"}
+      },
+      "required": ["name", "image", "restartPolicy"]
+    },
+    "volume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "emptyDir": {"type": "object", "additionalProperties": false, "properties": {"medium": {"enum": ["", "Memory"]}, "sizeLimit": {"type": "string"}}},
+        "persistentVolumeClaim": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"claimName": {"type": "string", "minLength": 1}, "readOnly": {"type": "boolean"}},
+          "required": ["claimName"]
+        },
+        "ephemeral": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "volumeClaimTemplate": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "spec": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "accessModes": {"type": "array", "items": {"enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"]}},
+                    "storageClassName": {"type": "string", "minLength": 1},
+                    "resources": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "requests": {"type": "object", "additionalProperties": false, "properties": {"storage": {"type": "string", "minLength": 1}}, "required": ["storage"]}
+                      },
+                      "required": ["requests"]
+                    }
+                  },
+                  "required": ["accessModes", "storageClassName", "resources"]
+                }
+              },
+              "required": ["spec"]
+            }
+          },
+          "required": ["volumeClaimTemplate"]
+        }
+      },
+      "required": ["name"],
+      "oneOf": [{"required": ["emptyDir"]}, {"required": ["persistentVolumeClaim"]}, {"required": ["ephemeral"]}]
+    }
+  }
+}
