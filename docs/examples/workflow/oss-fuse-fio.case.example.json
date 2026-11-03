@@ -1,0 +1,1020 @@
+{
+  "name": "OSS 上传 / FUSE 全量预热 / fio 顺序读",
+  "description": "参数化三阶段用例。需替换镜像、路由、OSS、PVC 和节点占位值；完整读取预热不证明缓存命中率。",
+  "base_revision": 0,
+  "change_note": "首版工具链",
+  "body": {
+    "schema_version": "workflow/v1alpha1",
+    "backend": "uce",
+    "template": {
+      "schema_version": "0.1.0",
+      "artifact_contract": "paths-v1",
+      "root_dag_version_id": "d589d04d-77b6-5e58-bb7e-73debd41db50",
+      "dag_definitions": [
+        {
+          "dag_id": "fe0ebdae-6e5b-589d-9cdc-3529b326a1bb",
+          "dag_version_id": "d589d04d-77b6-5e58-bb7e-73debd41db50",
+          "name": "oss-fuse-fio",
+          "version": "0.1.0",
+          "inputs": [
+            {
+              "id": "in-file_size_bytes",
+              "name": "file_size_bytes",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-file_count",
+              "name": "file_count",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-dataset_prefix",
+              "name": "dataset_prefix",
+              "type": "string",
+              "required": true
+            },
+            {
+              "id": "in-data_seed",
+              "name": "data_seed",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-upload_concurrency",
+              "name": "upload_concurrency",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-warmup_timeout_seconds",
+              "name": "warmup_timeout_seconds",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-fio_bs_bytes",
+              "name": "fio_bs_bytes",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-fio_numjobs",
+              "name": "fio_numjobs",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-fio_iodepth",
+              "name": "fio_iodepth",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-fio_ioengine",
+              "name": "fio_ioengine",
+              "type": "string",
+              "required": true
+            },
+            {
+              "id": "in-fio_direct",
+              "name": "fio_direct",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-fio_runtime_seconds",
+              "name": "fio_runtime_seconds",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "id": "in-context",
+              "name": "malta_context",
+              "type": "json",
+              "required": true
+            }
+          ],
+          "outputs": [],
+          "nodes": [
+            {
+              "definition_node_id": "dddbeea7-cde7-5c9b-9329-76e4ca12f803",
+              "name": "upload",
+              "kind": "operator",
+              "target_version_id": "30f3d65a-303f-5ba9-a607-5d1de1aafe4c",
+              "input_bindings": {
+                "file_size_bytes": {
+                  "kind": "dag_input",
+                  "input_id": "in-file_size_bytes"
+                },
+                "file_count": {
+                  "kind": "dag_input",
+                  "input_id": "in-file_count"
+                },
+                "dataset_prefix": {
+                  "kind": "dag_input",
+                  "input_id": "in-dataset_prefix"
+                },
+                "data_seed": {
+                  "kind": "dag_input",
+                  "input_id": "in-data_seed"
+                },
+                "upload_concurrency": {
+                  "kind": "dag_input",
+                  "input_id": "in-upload_concurrency"
+                },
+                "warmup_timeout_seconds": {
+                  "kind": "dag_input",
+                  "input_id": "in-warmup_timeout_seconds"
+                },
+                "fio_bs_bytes": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_bs_bytes"
+                },
+                "fio_numjobs": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_numjobs"
+                },
+                "fio_iodepth": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_iodepth"
+                },
+                "fio_ioengine": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_ioengine"
+                },
+                "fio_direct": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_direct"
+                },
+                "fio_runtime_seconds": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_runtime_seconds"
+                },
+                "malta_context": {
+                  "kind": "dag_input",
+                  "input_id": "in-context"
+                }
+              },
+              "input_path": []
+            },
+            {
+              "definition_node_id": "8706dca0-3134-5628-b125-d5ff980f63ef",
+              "name": "warmup",
+              "kind": "operator",
+              "target_version_id": "8b04de1f-7daa-5400-b8b0-26892941eca1",
+              "input_bindings": {
+                "file_size_bytes": {
+                  "kind": "dag_input",
+                  "input_id": "in-file_size_bytes"
+                },
+                "file_count": {
+                  "kind": "dag_input",
+                  "input_id": "in-file_count"
+                },
+                "dataset_prefix": {
+                  "kind": "dag_input",
+                  "input_id": "in-dataset_prefix"
+                },
+                "data_seed": {
+                  "kind": "dag_input",
+                  "input_id": "in-data_seed"
+                },
+                "upload_concurrency": {
+                  "kind": "dag_input",
+                  "input_id": "in-upload_concurrency"
+                },
+                "warmup_timeout_seconds": {
+                  "kind": "dag_input",
+                  "input_id": "in-warmup_timeout_seconds"
+                },
+                "fio_bs_bytes": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_bs_bytes"
+                },
+                "fio_numjobs": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_numjobs"
+                },
+                "fio_iodepth": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_iodepth"
+                },
+                "fio_ioengine": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_ioengine"
+                },
+                "fio_direct": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_direct"
+                },
+                "fio_runtime_seconds": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_runtime_seconds"
+                },
+                "malta_context": {
+                  "kind": "dag_input",
+                  "input_id": "in-context"
+                }
+              },
+              "input_path": [
+                {
+                  "from_node": "dddbeea7-cde7-5c9b-9329-76e4ca12f803",
+                  "output": "dataset"
+                }
+              ]
+            },
+            {
+              "definition_node_id": "d4dd6124-e5d6-5673-917a-5ba9c277db2f",
+              "name": "fio-read",
+              "kind": "operator",
+              "target_version_id": "444db8b6-0c8a-5197-8bc8-07097b95c55f",
+              "input_bindings": {
+                "file_size_bytes": {
+                  "kind": "dag_input",
+                  "input_id": "in-file_size_bytes"
+                },
+                "file_count": {
+                  "kind": "dag_input",
+                  "input_id": "in-file_count"
+                },
+                "dataset_prefix": {
+                  "kind": "dag_input",
+                  "input_id": "in-dataset_prefix"
+                },
+                "data_seed": {
+                  "kind": "dag_input",
+                  "input_id": "in-data_seed"
+                },
+                "upload_concurrency": {
+                  "kind": "dag_input",
+                  "input_id": "in-upload_concurrency"
+                },
+                "warmup_timeout_seconds": {
+                  "kind": "dag_input",
+                  "input_id": "in-warmup_timeout_seconds"
+                },
+                "fio_bs_bytes": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_bs_bytes"
+                },
+                "fio_numjobs": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_numjobs"
+                },
+                "fio_iodepth": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_iodepth"
+                },
+                "fio_ioengine": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_ioengine"
+                },
+                "fio_direct": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_direct"
+                },
+                "fio_runtime_seconds": {
+                  "kind": "dag_input",
+                  "input_id": "in-fio_runtime_seconds"
+                },
+                "malta_context": {
+                  "kind": "dag_input",
+                  "input_id": "in-context"
+                }
+              },
+              "input_path": [
+                {
+                  "from_node": "8706dca0-3134-5628-b125-d5ff980f63ef",
+                  "output": "warmup"
+                }
+              ]
+            }
+          ],
+          "output_bindings": {}
+        }
+      ],
+      "operator_definitions": [
+        {
+          "operator_id": "4ad833fd-742f-58f0-9227-77b94dea09ee",
+          "operator_version_id": "30f3d65a-303f-5ba9-a607-5d1de1aafe4c",
+          "name": "upload",
+          "version": "0.1.0",
+          "resource_pool": "replace-resource-pool",
+          "inputs": [
+            {
+              "name": "file_size_bytes",
+              "type": "integer"
+            },
+            {
+              "name": "file_count",
+              "type": "integer"
+            },
+            {
+              "name": "dataset_prefix",
+              "type": "string"
+            },
+            {
+              "name": "data_seed",
+              "type": "integer"
+            },
+            {
+              "name": "upload_concurrency",
+              "type": "integer"
+            },
+            {
+              "name": "warmup_timeout_seconds",
+              "type": "integer"
+            },
+            {
+              "name": "fio_bs_bytes",
+              "type": "integer"
+            },
+            {
+              "name": "fio_numjobs",
+              "type": "integer"
+            },
+            {
+              "name": "fio_iodepth",
+              "type": "integer"
+            },
+            {
+              "name": "fio_ioengine",
+              "type": "string"
+            },
+            {
+              "name": "fio_direct",
+              "type": "integer"
+            },
+            {
+              "name": "fio_runtime_seconds",
+              "type": "integer"
+            },
+            {
+              "name": "malta_context",
+              "type": "json"
+            }
+          ],
+          "outputs": [],
+          "output_path": [
+            {
+              "name": "dataset",
+              "path": "${output_root}/${run_id}/${stage_name}/${attempt}/${eviction_count}/dataset.json"
+            },
+            {
+              "name": "evidence",
+              "path": "${output_root}/${run_id}/${stage_name}/${attempt}/${eviction_count}/evidence.json"
+            }
+          ],
+          "execution": {
+            "retryLimit": 0
+          },
+          "manifest": {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+              "name": "upload"
+            },
+            "spec": {
+              "restartPolicy": "Never",
+              "containers": [
+                {
+                  "name": "main",
+                  "image": "registry.example.invalid/marea-test-tools:replace",
+                  "command": [
+                    "/usr/local/bin/marea-test-tools"
+                  ],
+                  "args": [
+                    "upload"
+                  ],
+                  "env": [
+                    {
+                      "name": "MAREA_TEST_PARAMS",
+                      "value": "{{ toJson .task_params }}"
+                    },
+                    {
+                      "name": "RUN_ID",
+                      "value": "{{ .pending_task.run_id }}"
+                    },
+                    {
+                      "name": "STAGE_ID",
+                      "value": "{{ .pending_task.stagerun_id }}"
+                    },
+                    {
+                      "name": "ATTEMPT",
+                      "value": "{{ .pending_task.attempt }}"
+                    },
+                    {
+                      "name": "EVICTION_COUNT",
+                      "value": "{{ .pending_task.eviction_count }}"
+                    },
+                    {
+                      "name": "NODE_ID",
+                      "value": "dddbeea7-cde7-5c9b-9329-76e4ca12f803"
+                    },
+                    {
+                      "name": "RESULTS_ROOT",
+                      "value": "/results"
+                    },
+                    {
+                      "name": "BENCH_ROOT",
+                      "value": "/bench"
+                    },
+                    {
+                      "name": "OSS_ENDPOINT",
+                      "value": "https://oss-region.example.invalid"
+                    },
+                    {
+                      "name": "OSS_BUCKET",
+                      "value": "replace-bucket"
+                    },
+                    {
+                      "name": "OSS_ACCESS_KEY_ID",
+                      "valueFrom": {
+                        "secretKeyRef": {
+                          "name": "replace-oss-secret",
+                          "key": "OSS_ACCESS_KEY_ID",
+                          "optional": false
+                        }
+                      }
+                    },
+                    {
+                      "name": "OSS_ACCESS_KEY_SECRET",
+                      "valueFrom": {
+                        "secretKeyRef": {
+                          "name": "replace-oss-secret",
+                          "key": "OSS_ACCESS_KEY_SECRET",
+                          "optional": false
+                        }
+                      }
+                    },
+                    {
+                      "name": "OSS_SESSION_TOKEN",
+                      "valueFrom": {
+                        "secretKeyRef": {
+                          "name": "replace-oss-secret",
+                          "key": "OSS_SESSION_TOKEN",
+                          "optional": true
+                        }
+                      }
+                    }
+                  ],
+                  "resources": {
+                    "requests": {
+                      "cpu": "1",
+                      "memory": "512Mi"
+                    },
+                    "limits": {
+                      "cpu": "1",
+                      "memory": "1Gi"
+                    }
+                  },
+                  "volumeMounts": [
+                    {
+                      "name": "results",
+                      "mountPath": "/results"
+                    },
+                    {
+                      "name": "scratch",
+                      "mountPath": "/tmp"
+                    }
+                  ]
+                }
+              ],
+              "volumes": [
+                {
+                  "name": "results",
+                  "persistentVolumeClaim": {
+                    "claimName": "replace-shared-results-pvc"
+                  }
+                },
+                {
+                  "name": "scratch",
+                  "emptyDir": {
+                    "sizeLimit": "1Gi"
+                  }
+                }
+              ],
+              "nodeSelector": {
+                "kubernetes.io/hostname": "replace-client-node"
+              }
+            }
+          }
+        },
+        {
+          "operator_id": "88998957-07c0-51e9-87c8-48e89841d7aa",
+          "operator_version_id": "8b04de1f-7daa-5400-b8b0-26892941eca1",
+          "name": "warmup",
+          "version": "0.1.0",
+          "resource_pool": "replace-resource-pool",
+          "inputs": [
+            {
+              "name": "file_size_bytes",
+              "type": "integer"
+            },
+            {
+              "name": "file_count",
+              "type": "integer"
+            },
+            {
+              "name": "dataset_prefix",
+              "type": "string"
+            },
+            {
+              "name": "data_seed",
+              "type": "integer"
+            },
+            {
+              "name": "upload_concurrency",
+              "type": "integer"
+            },
+            {
+              "name": "warmup_timeout_seconds",
+              "type": "integer"
+            },
+            {
+              "name": "fio_bs_bytes",
+              "type": "integer"
+            },
+            {
+              "name": "fio_numjobs",
+              "type": "integer"
+            },
+            {
+              "name": "fio_iodepth",
+              "type": "integer"
+            },
+            {
+              "name": "fio_ioengine",
+              "type": "string"
+            },
+            {
+              "name": "fio_direct",
+              "type": "integer"
+            },
+            {
+              "name": "fio_runtime_seconds",
+              "type": "integer"
+            },
+            {
+              "name": "malta_context",
+              "type": "json"
+            }
+          ],
+          "outputs": [],
+          "output_path": [
+            {
+              "name": "warmup",
+              "path": "${output_root}/${run_id}/${stage_name}/${attempt}/${eviction_count}/warmup.json"
+            },
+            {
+              "name": "evidence",
+              "path": "${output_root}/${run_id}/${stage_name}/${attempt}/${eviction_count}/evidence.json"
+            }
+          ],
+          "execution": {
+            "retryLimit": 0
+          },
+          "manifest": {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+              "name": "warmup"
+            },
+            "spec": {
+              "restartPolicy": "Never",
+              "containers": [
+                {
+                  "name": "main",
+                  "image": "registry.example.invalid/marea-test-tools:replace",
+                  "command": [
+                    "/usr/local/bin/marea-test-tools"
+                  ],
+                  "args": [
+                    "warmup"
+                  ],
+                  "env": [
+                    {
+                      "name": "MAREA_TEST_PARAMS",
+                      "value": "{{ toJson .task_params }}"
+                    },
+                    {
+                      "name": "RUN_ID",
+                      "value": "{{ .pending_task.run_id }}"
+                    },
+                    {
+                      "name": "STAGE_ID",
+                      "value": "{{ .pending_task.stagerun_id }}"
+                    },
+                    {
+                      "name": "ATTEMPT",
+                      "value": "{{ .pending_task.attempt }}"
+                    },
+                    {
+                      "name": "EVICTION_COUNT",
+                      "value": "{{ .pending_task.eviction_count }}"
+                    },
+                    {
+                      "name": "NODE_ID",
+                      "value": "8706dca0-3134-5628-b125-d5ff980f63ef"
+                    },
+                    {
+                      "name": "RESULTS_ROOT",
+                      "value": "/results"
+                    },
+                    {
+                      "name": "BENCH_ROOT",
+                      "value": "/bench"
+                    }
+                  ],
+                  "resources": {
+                    "requests": {
+                      "cpu": "1",
+                      "memory": "512Mi"
+                    },
+                    "limits": {
+                      "cpu": "1",
+                      "memory": "1Gi"
+                    }
+                  },
+                  "volumeMounts": [
+                    {
+                      "name": "results",
+                      "mountPath": "/results"
+                    },
+                    {
+                      "name": "scratch",
+                      "mountPath": "/tmp"
+                    },
+                    {
+                      "name": "benchmark",
+                      "mountPath": "/bench",
+                      "readOnly": true
+                    }
+                  ]
+                }
+              ],
+              "volumes": [
+                {
+                  "name": "results",
+                  "persistentVolumeClaim": {
+                    "claimName": "replace-shared-results-pvc"
+                  }
+                },
+                {
+                  "name": "scratch",
+                  "emptyDir": {
+                    "sizeLimit": "1Gi"
+                  }
+                },
+                {
+                  "name": "benchmark",
+                  "persistentVolumeClaim": {
+                    "claimName": "replace-curvine-pvc"
+                  }
+                }
+              ],
+              "nodeSelector": {
+                "kubernetes.io/hostname": "replace-client-node"
+              }
+            }
+          }
+        },
+        {
+          "operator_id": "3a136489-3a0b-5904-872a-1aa072ef1c07",
+          "operator_version_id": "444db8b6-0c8a-5197-8bc8-07097b95c55f",
+          "name": "fio-read",
+          "version": "0.1.0",
+          "resource_pool": "replace-resource-pool",
+          "inputs": [
+            {
+              "name": "file_size_bytes",
+              "type": "integer"
+            },
+            {
+              "name": "file_count",
+              "type": "integer"
+            },
+            {
+              "name": "dataset_prefix",
+              "type": "string"
+            },
+            {
+              "name": "data_seed",
+              "type": "integer"
+            },
+            {
+              "name": "upload_concurrency",
+              "type": "integer"
+            },
+            {
+              "name": "warmup_timeout_seconds",
+              "type": "integer"
+            },
+            {
+              "name": "fio_bs_bytes",
+              "type": "integer"
+            },
+            {
+              "name": "fio_numjobs",
+              "type": "integer"
+            },
+            {
+              "name": "fio_iodepth",
+              "type": "integer"
+            },
+            {
+              "name": "fio_ioengine",
+              "type": "string"
+            },
+            {
+              "name": "fio_direct",
+              "type": "integer"
+            },
+            {
+              "name": "fio_runtime_seconds",
+              "type": "integer"
+            },
+            {
+              "name": "malta_context",
+              "type": "json"
+            }
+          ],
+          "outputs": [],
+          "output_path": [
+            {
+              "name": "evidence",
+              "path": "${output_root}/${run_id}/${stage_name}/${attempt}/${eviction_count}/evidence.json"
+            }
+          ],
+          "execution": {
+            "retryLimit": 0
+          },
+          "manifest": {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+              "name": "fio-read"
+            },
+            "spec": {
+              "restartPolicy": "Never",
+              "containers": [
+                {
+                  "name": "main",
+                  "image": "registry.example.invalid/marea-test-tools:replace",
+                  "command": [
+                    "/usr/local/bin/marea-test-tools"
+                  ],
+                  "args": [
+                    "fio-read"
+                  ],
+                  "env": [
+                    {
+                      "name": "MAREA_TEST_PARAMS",
+                      "value": "{{ toJson .task_params }}"
+                    },
+                    {
+                      "name": "RUN_ID",
+                      "value": "{{ .pending_task.run_id }}"
+                    },
+                    {
+                      "name": "STAGE_ID",
+                      "value": "{{ .pending_task.stagerun_id }}"
+                    },
+                    {
+                      "name": "ATTEMPT",
+                      "value": "{{ .pending_task.attempt }}"
+                    },
+                    {
+                      "name": "EVICTION_COUNT",
+                      "value": "{{ .pending_task.eviction_count }}"
+                    },
+                    {
+                      "name": "NODE_ID",
+                      "value": "d4dd6124-e5d6-5673-917a-5ba9c277db2f"
+                    },
+                    {
+                      "name": "RESULTS_ROOT",
+                      "value": "/results"
+                    },
+                    {
+                      "name": "BENCH_ROOT",
+                      "value": "/bench"
+                    }
+                  ],
+                  "resources": {
+                    "requests": {
+                      "cpu": "1",
+                      "memory": "512Mi"
+                    },
+                    "limits": {
+                      "cpu": "1",
+                      "memory": "1Gi"
+                    }
+                  },
+                  "volumeMounts": [
+                    {
+                      "name": "results",
+                      "mountPath": "/results"
+                    },
+                    {
+                      "name": "scratch",
+                      "mountPath": "/tmp"
+                    },
+                    {
+                      "name": "benchmark",
+                      "mountPath": "/bench",
+                      "readOnly": true
+                    }
+                  ]
+                }
+              ],
+              "volumes": [
+                {
+                  "name": "results",
+                  "persistentVolumeClaim": {
+                    "claimName": "replace-shared-results-pvc"
+                  }
+                },
+                {
+                  "name": "scratch",
+                  "emptyDir": {
+                    "sizeLimit": "1Gi"
+                  }
+                },
+                {
+                  "name": "benchmark",
+                  "persistentVolumeClaim": {
+                    "claimName": "replace-curvine-pvc"
+                  }
+                }
+              ],
+              "nodeSelector": {
+                "kubernetes.io/hostname": "replace-client-node"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file_size_bytes": {
+          "type": "integer",
+          "default": 4194304,
+          "minimum": 4096,
+          "maximum": 1073741824
+        },
+        "file_count": {
+          "type": "integer",
+          "default": 256,
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "dataset_prefix": {
+          "type": "string",
+          "default": "malta-read-cache",
+          "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$",
+          "maxLength": 160
+        },
+        "data_seed": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "upload_concurrency": {
+          "type": "integer",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 16
+        },
+        "warmup_timeout_seconds": {
+          "type": "integer",
+          "default": 600,
+          "minimum": 1,
+          "maximum": 21600
+        },
+        "fio_bs_bytes": {
+          "type": "integer",
+          "default": 1048576,
+          "minimum": 4096,
+          "maximum": 16777216
+        },
+        "fio_numjobs": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 16
+        },
+        "fio_iodepth": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 128
+        },
+        "fio_ioengine": {
+          "type": "string",
+          "default": "psync",
+          "enum": [
+            "psync",
+            "libaio"
+          ]
+        },
+        "fio_direct": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 1
+        },
+        "fio_runtime_seconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 1,
+          "maximum": 3600
+        }
+      },
+      "required": [
+        "file_size_bytes",
+        "file_count",
+        "dataset_prefix",
+        "data_seed",
+        "upload_concurrency",
+        "warmup_timeout_seconds",
+        "fio_bs_bytes",
+        "fio_numjobs",
+        "fio_iodepth",
+        "fio_ioengine",
+        "fio_direct",
+        "fio_runtime_seconds"
+      ]
+    },
+    "defaults": {
+      "file_size_bytes": 4194304,
+      "file_count": 256,
+      "dataset_prefix": "malta-read-cache",
+      "data_seed": 1,
+      "upload_concurrency": 4,
+      "warmup_timeout_seconds": 600,
+      "fio_bs_bytes": 1048576,
+      "fio_numjobs": 1,
+      "fio_iodepth": 1,
+      "fio_ioengine": "psync",
+      "fio_direct": 1,
+      "fio_runtime_seconds": 60
+    },
+    "timeout_seconds": 12000,
+    "dataset": {
+      "file_size_parameter": "file_size_bytes",
+      "file_count_parameter": "file_count"
+    },
+    "results": [
+      {
+        "node_id": "dddbeea7-cde7-5c9b-9329-76e4ca12f803",
+        "output": "evidence",
+        "required": true,
+        "parser": "assertions-v1",
+        "assertions": [
+          "objects_verified",
+          "dataset_complete"
+        ]
+      },
+      {
+        "node_id": "8706dca0-3134-5628-b125-d5ff980f63ef",
+        "output": "evidence",
+        "required": true,
+        "parser": "assertions-v1",
+        "assertions": [
+          "full_read_completed",
+          "dataset_sizes_verified"
+        ]
+      },
+      {
+        "node_id": "d4dd6124-e5d6-5673-917a-5ba9c277db2f",
+        "output": "evidence",
+        "required": true,
+        "parser": "fio-3.33",
+        "assertions": [
+          "warmup_completed",
+          "dataset_sizes_verified"
+        ],
+        "expected_options": {
+          "rw": "read",
+          "allow_file_create": "0",
+          "time_based": "1"
+        },
+        "option_parameters": {
+          "bs": "fio_bs_bytes",
+          "numjobs": "fio_numjobs",
+          "iodepth": "fio_iodepth",
+          "ioengine": "fio_ioengine",
+          "direct": "fio_direct",
+          "runtime": "fio_runtime_seconds"
+        }
+      }
+    ]
+  }
+}

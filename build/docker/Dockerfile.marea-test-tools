@@ -1,0 +1,15 @@
+# Supply the verified Malta Runner image digest (fio 3.33 + Python 3.11).
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER 0:0
+# Prepared on the development machine from pinned requirements; never include credentials.
+COPY build/output/marea-test-tools/deps /opt/marea-test-tools/deps
+COPY build/output/marea-test-tools/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY build/output/marea-test-tools/requirements.lock /opt/marea-test-tools/requirements.lock
+COPY build/output/marea-test-tools/dependencies.json /opt/marea-test-tools/dependencies.json
+COPY tools/marea-test-tools/tasks.py /opt/marea-test-tools/tasks.py
+COPY --chmod=755 tools/marea-test-tools/marea-test-tools /usr/local/bin/marea-test-tools
+ENV PYTHONPATH=/opt/marea-test-tools/deps PYTHONDONTWRITEBYTECODE=1
+USER 10001:10001
+ENTRYPOINT ["/usr/local/bin/marea-test-tools"]
+CMD ["version"]

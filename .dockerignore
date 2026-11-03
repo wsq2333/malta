@@ -7,3 +7,10 @@ build/*
 !LICENSE
 !NOTICE
 !THIRD_PARTY_NOTICES.md
+
+!tools/
+tools/*
+!tools/marea-test-tools/
+tools/marea-test-tools/*
+!tools/marea-test-tools/tasks.py
+!tools/marea-test-tools/marea-test-tools

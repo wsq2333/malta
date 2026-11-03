@@ -37,6 +37,8 @@ Agent 发起测试可使用[提示词填空模板](docs/agent-benchmark-prompt.m
 
 [工作流测试使用说明](docs/workflows.md)包含页面操作、完整 EP 示例、`serve --workflow-config` 配置、Agent CLI、结果契约与问题关联。已实现 UCE 与 Argo Server REST 适配，原生 DAG 语义交由后端。支持 Secret 文件提供账号密码/客户端密钥并自动获取和刷新 Token；测试采用模拟后端，真实集群联调和部署另行进行。
 
+首个三阶段测试工具与模板见 [marea-test-tools](tools/marea-test-tools/README.md)：OSS 上传 → FUSE 完整读取预热 → fio 3.33 顺序读。测试参数通过 DAG 输入绑定到 `task_params`，提供 1 GiB / 256 GiB 参数示例和 Malta 结果解析规则；环境绑定需在提交前配置。
+
 ```text
 用例管理 → 工作流用例 → 保存原生 EP / Argo 模板、可选参数 Schema 与结果解析
 环境与版本 → 被测系统与执行配置 → 固定环境、软件、路由、客户端与卷

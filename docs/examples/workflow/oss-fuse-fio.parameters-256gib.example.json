@@ -1,0 +1,14 @@
+{
+  "file_size_bytes": 4194304,
+  "file_count": 65536,
+  "dataset_prefix": "malta-read-cache",
+  "data_seed": 1,
+  "upload_concurrency": 4,
+  "warmup_timeout_seconds": 7200,
+  "fio_bs_bytes": 1048576,
+  "fio_numjobs": 1,
+  "fio_iodepth": 1,
+  "fio_ioengine": "psync",
+  "fio_direct": 1,
+  "fio_runtime_seconds": 60
+}

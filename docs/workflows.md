@@ -167,3 +167,8 @@ API 根路径 `/api/v1/workflow`。对应 `connections`、`records/{cases|system
 代码验收使用开发机上的模拟 Keycloak、UCE、Argo REST 接口与共享证据目录。它验证协议、恢复和解析逻辑，不等价于真实集群授权/CSI/控制器验收；本次代码变更不自动更新现有集群镜像，也不创建账号或真实 Secret。
 
 协议依据：[Argo REST API](https://argo-workflows.readthedocs.io/en/latest/swagger/)、[Argo 模板变量](https://argo-workflows.readthedocs.io/en/latest/variables/)、[Keycloak Grant Types](https://github.com/keycloak/keycloak/blob/main/docs/guides/securing-apps/partials/oidc/supported-grant-types.adoc)。
+
+
+## 参数化 OSS / FUSE / fio 示例
+
+[marea-test-tools](../tools/marea-test-tools/README.md) 提供三阶段原生 EP、Malta 用例、1 GiB / 256 GiB 参数示例及独立工具镜像构建方式。文件大小、数量和 fio 配置由 DAG 输入传入 `task_params`；凭据由 Secret 注入。首版预热通过 FUSE 完整读取，未验证缓存命中率。
