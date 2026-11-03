@@ -13,6 +13,8 @@ import (
 func migrate(s *store.Store) error {
 	_, e := s.DB.Exec(`CREATE TABLE IF NOT EXISTS workflow_records(kind TEXT NOT NULL,id TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id,revision));
  CREATE TABLE IF NOT EXISTS workflow_preflights(id TEXT PRIMARY KEY,body TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS workflow_issue_links(run_id TEXT NOT NULL,issue_id TEXT NOT NULL,role TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(run_id,issue_id,role));
+ CREATE INDEX IF NOT EXISTS workflow_issue_by_issue ON workflow_issue_links(issue_id);
  CREATE TABLE IF NOT EXISTS workflow_runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,body TEXT NOT NULL,updated_at TEXT NOT NULL);`)
 	return e
 }

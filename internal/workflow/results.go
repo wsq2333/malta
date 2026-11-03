@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -113,8 +114,8 @@ func (m *Manager) collect(r *Run, o backend.Observation, b backend.Backend, cfg 
 		rr.StageID = stage.ID
 		rr.Attempt = stage.Attempt
 		var e error
-		if !found || strings.ToLower(stage.Status) != "succeeded" {
-			e = fmt.Errorf("required stage has no successful current attempt")
+		if !found || !terminal(strings.ToLower(stage.Status)) && strings.ToLower(stage.Status) != "timeout" {
+			e = fmt.Errorf("required stage has no terminal current attempt")
 		} else {
 			var outputs []backend.Output
 			outputs, e = b.Outputs(m.ctx, r.ExternalRunID, stage)
@@ -287,6 +288,7 @@ func parseJUnit(raw []byte) (int, int, int, error) {
 	bad, skip := false, false
 	seen := map[string]bool{}
 	root := ""
+	expectedTests, expectedSkipped := -1, -1
 	for {
 		token, e := dec.Token()
 		if e == io.EOF {
@@ -303,6 +305,19 @@ func parseJUnit(raw []byte) (int, int, int, error) {
 					return 0, 0, 0, domain.E("invalid", "invalid JUnit root")
 				}
 				root = t.Name.Local
+				for _, a := range t.Attr {
+					if a.Name.Local == "tests" || a.Name.Local == "skipped" {
+						n, e := strconv.Atoi(a.Value)
+						if e != nil || n < 0 {
+							return 0, 0, 0, domain.E("invalid", "invalid JUnit declared count")
+						}
+						if a.Name.Local == "tests" {
+							expectedTests = n
+						} else {
+							expectedSkipped = n
+						}
+					}
+				}
 			}
 			if t.Name.Local == "testcase" {
 				if inCase {
@@ -348,7 +363,7 @@ func parseJUnit(raw []byte) (int, int, int, error) {
 			return 0, 0, 0, domain.E("invalid", "XML directives not supported")
 		}
 	}
-	if count == 0 || depth != 0 {
+	if count == 0 || depth != 0 || expectedTests >= 0 && expectedTests != count || expectedSkipped >= 0 && expectedSkipped != skipped {
 		return 0, 0, 0, domain.E("invalid", "JUnit contains no tests or is incomplete")
 	}
 	return count, failed, skipped, nil

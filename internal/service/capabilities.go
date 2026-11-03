@@ -5,6 +5,9 @@ import "github.com/wsq2333/malta/internal/domain"
 func (m *Manager) Capabilities() domain.Capabilities {
 	c := domain.OfflineCapabilities()
 	c.Mode = "server"
+	c.Features["workflow_cases"] = true
+	c.Features["workflow_execution"] = m.Workflows != nil && m.Workflows.Enabled()
+	c.Features["workflow_backend_uce"] = c.Features["workflow_execution"]
 	c.Executors = []string{}
 	if len(m.Config.AllowedRoots) > 0 {
 		c.Executors = append(c.Executors, "local")

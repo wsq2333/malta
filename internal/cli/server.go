@@ -11,6 +11,7 @@ import (
 	kube "github.com/wsq2333/malta/internal/executor/kubernetes"
 	"github.com/wsq2333/malta/internal/service"
 	"github.com/wsq2333/malta/internal/store"
+	"github.com/wsq2333/malta/internal/workflow"
 	"github.com/wsq2333/malta/web"
 	"io"
 	"net"
@@ -83,7 +84,7 @@ func validateServeAccess(address, token string, allowUnauthenticated bool) error
 	return nil
 }
 func serverCommands(root *cobra.Command, o *Options) {
-	var address, fioPath, kubeConfig string
+	var address, fioPath, kubeConfig, workflowConfig string
 	var managementOnly, allowUnauthenticated bool
 	var allowed []string
 	var bytesBudget int64
@@ -108,7 +109,13 @@ func serverCommands(root *cobra.Command, o *Options) {
 				return e
 			}
 		}
-		m, e := service.New(s, service.Config{ManagementOnly: managementOnly, AllowedRoots: allowed, Fio: fioPath, MaxBytes: bytesBudget, Timeout: timeout, Kubernetes: backend})
+		var wc workflow.Config
+		if workflowConfig != "" {
+			if e = domain.Read(workflowConfig, &wc); e != nil {
+				return e
+			}
+		}
+		m, e := service.New(s, service.Config{Workflows: wc, ManagementOnly: managementOnly, AllowedRoots: allowed, Fio: fioPath, MaxBytes: bytesBudget, Timeout: timeout, Kubernetes: backend})
 		if e != nil {
 			return e
 		}
@@ -142,11 +149,13 @@ func serverCommands(root *cobra.Command, o *Options) {
 	f.StringVar(&fioPath, "fio", "fio", "fio executable")
 	f.Int64Var(&bytesBudget, "max-bytes", 1<<30, "Maximum prepared bytes per run")
 	f.DurationVar(&timeout, "run-timeout", time.Hour, "Total per-run deadline")
+	f.StringVar(&workflowConfig, "workflow-config", "", "UCE connections JSON; credentials referenced by file")
 	f.StringVar(&kubeConfig, "kubernetes-config", "", "Kubernetes executor config JSON (enables Jobs)")
 	f.BoolVar(&managementOnly, "management-only", false, "Serve case and result management without executing or reconciling runs")
 	f.BoolVar(&allowUnauthenticated, "allow-unauthenticated", false, "Explicitly allow access without an API token on a trusted private network")
 	serve.MarkFlagsMutuallyExclusive("management-only", "allow-target")
 	serve.MarkFlagsMutuallyExclusive("management-only", "kubernetes-config")
+	serve.MarkFlagsMutuallyExclusive("management-only", "workflow-config")
 
 	run := &cobra.Command{Use: "run"}
 	run.AddCommand(historyCommand(o), lookupCommand(o))

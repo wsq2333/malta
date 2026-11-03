@@ -204,7 +204,7 @@ func TestPathAndJUnitValidation(t *testing.T) {
 			t.Fatal("unsafe path accepted", p)
 		}
 	}
-	for _, raw := range []string{`<testsuite/>`, `<testsuite><testcase name="x"/><testcase name="x"/></testsuite>`, `<!DOCTYPE x><testsuite><testcase name="x"/></testsuite>`} {
+	for _, raw := range []string{`<testsuite/>`, `<testsuite tests="2"><testcase name="one"/></testsuite>`, `<testsuite><testcase name="x"/><testcase name="x"/></testsuite>`, `<!DOCTYPE x><testsuite><testcase name="x"/></testsuite>`} {
 		if _, _, _, e := parseJUnit([]byte(raw)); e == nil {
 			t.Fatal("invalid report accepted")
 		}
@@ -286,5 +286,59 @@ func TestCancelFlagSurvivesWorkerPersistence(t *testing.T) {
 	current, _ := m.Get(r.ID)
 	if !current.CancelRequested {
 		t.Fatal("worker lost concurrent cancellation")
+	}
+}
+
+func TestFioEvidenceAndFailedStageReport(t *testing.T) {
+	m, q, cfg := fixture(t)
+	p, _ := m.Preflight(q)
+	r, e := m.Start(Start{p.ID, p.Snapshot.Hash, "parsers"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	r.ExternalRunID = "external-run"
+	r.ExternalVersionID = "external-version"
+	rule := r.Snapshot.Definition.Results[0]
+	stage := backend.Stage{ID: "stage", NodeID: rule.NodeID, Status: "Failed"}
+	root := filepath.Join(cfg.LocalResultsRoot, "external-run/stage/0")
+	_ = os.MkdirAll(root, 0700)
+	publish := func(parser, filename string, raw []byte) {
+		t.Helper()
+		_ = os.WriteFile(filepath.Join(root, filename), raw, 0600)
+		manifest := Evidence{SchemaVersion: "malta.evidence/v1", UCERunID: r.ExternalRunID, UCEVersionID: r.ExternalVersionID, SnapshotHash: r.Snapshot.Hash, NodeID: rule.NodeID, StageID: stage.ID, EnvironmentID: r.Snapshot.Environment.ID, SoftwareVersionID: r.Snapshot.Version.ID, Parser: parser, Assertions: map[string]bool{}, Files: []EvidenceFile{{filename, domain.BytesHash(raw), int64(len(raw))}}}
+		data, _ := json.Marshal(manifest)
+		_ = os.WriteFile(filepath.Join(root, "result.json"), data, 0600)
+	}
+	publish("junit", "junit.xml", []byte(`<testsuite tests="1"><testcase name="fails"><failure message="regression"/></testcase></testsuite>`))
+	f := m.backends["test"].(*fakeBackend)
+	f.outputs = []backend.Output{{RunID: r.ExternalRunID, StageID: stage.ID, Name: rule.Output, Path: "/shared/external-run/stage/0/result.json"}}
+	results, complete, invalid, passed := m.collect(&r, backend.Observation{Stages: []backend.Stage{stage}}, f, cfg)
+	if !complete || invalid || passed || results[0].Verdict != "failed" {
+		t.Fatal("failed stage report lost", results)
+	}
+	raw, e := os.ReadFile("../../testdata/fio/fio-3.33.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var fio map[string]any
+	_ = json.Unmarshal(raw, &fio)
+	job := fio["jobs"].([]any)[0].(map[string]any)
+	options := job["job options"].(map[string]any)
+	options["direct"] = "1"
+	options["allow_file_create"] = "0"
+	rule.Parser = "fio-3.33"
+	rule.ExpectedOptions = map[string]string{}
+	for _, k := range []string{"rw", "bs", "numjobs", "iodepth", "ioengine", "direct", "runtime", "allow_file_create"} {
+		rule.ExpectedOptions[k] = options[k].(string)
+	}
+	raw, _ = json.Marshal(fio)
+	publish("fio-3.33", "fio.json", raw)
+	result, e := m.verify(&r, rule, stage, f.outputs[0].Path, cfg, new(int64))
+	if e != nil || len(result.Metrics) == 0 {
+		t.Fatal(result, e)
+	}
+	rule.ExpectedOptions["bs"] = "4m"
+	if _, e = m.verify(&r, rule, stage, f.outputs[0].Path, cfg, new(int64)); e == nil {
+		t.Fatal("accepted wrong fio block size")
 	}
 }
