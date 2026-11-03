@@ -16,12 +16,12 @@ export function workspaceTabs(page: string) {
     case "baselines":
       return [
         { page: "baselines", label: "性能测试" },
-        { page: "automation", label: "自动化验证" },
+        { page: "automation", label: "工作流测试" },
       ];
     case "cases":
       return [
         { page: "cases", label: "性能计划" },
-        { page: "suites", label: "自动化套件" },
+        { page: "suites", label: "工作流用例" },
       ];
     case "environments":
       return [

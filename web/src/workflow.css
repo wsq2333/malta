@@ -1,0 +1,228 @@
+.wf-tabs,
+.wf-actions,
+.wf-facts {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.wf-tabs {
+  margin: 14px 0 24px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+.wf-tabs button[aria-selected="true"],
+.wf-tabs button[aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.wf-workspace {
+  padding: 8px 0;
+}
+.wf-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.wf-heading p,
+.wf-card p {
+  color: var(--text-muted);
+}
+.wf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+.wf-card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 22px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+.wf-card h3 {
+  margin: 12px 0;
+}
+.wf-card small {
+  display: block;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+.wf-tag {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.wf-reference,
+.wf-workspace pre,
+.wf-detail pre,
+.wf-wizard pre {
+  max-height: 420px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--inset);
+  padding: 16px;
+  border-radius: 8px;
+}
+.wf-editor,
+.wf-wizard,
+.wf-detail {
+  padding: 20px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.wf-editor label,
+.wf-wizard label {
+  display: grid;
+  gap: 7px;
+}
+.wf-code {
+  min-height: 330px;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wf-dag {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.wf-node {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 18px;
+  display: grid;
+  gap: 8px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+  max-width: 260px;
+}
+.wf-node small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.wf-table-wrap {
+  overflow: auto;
+}
+.wf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.wf-table th,
+.wf-table td {
+  text-align: left;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.wf-table td small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+.wf-stepper,
+.wf-progress {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wf-stepper li {
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.wf-stepper li[aria-current="step"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+.wf-progress li {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  flex: 1;
+  min-width: 140px;
+  display: grid;
+  gap: 8px;
+}
+.wf-progress small {
+  word-break: break-all;
+  font-size: 11px;
+}
+.wf-progress li[data-state="succeeded"] {
+  border-color: var(--success);
+}
+.wf-checks {
+  list-style: none;
+  padding: 0;
+}
+.wf-checks li {
+  border-left: 3px solid var(--success);
+  padding: 9px 15px;
+  margin: 10px 0;
+}
+.wf-checks li[data-state="warning"] {
+  border-color: var(--warning);
+}
+.wf-checks li[data-state="failed"] {
+  border-color: var(--error);
+}
+.wf-parameters {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.wf-actions {
+  margin-top: 16px;
+}
+.wf-facts span {
+  padding: 8px 12px;
+  background: var(--inset);
+  border-radius: 6px;
+}
+@media (max-width: 700px) {
+  .wf-heading {
+    display: block;
+  }
+  .wf-heading > button {
+    margin-top: 12px;
+  }
+  .wf-stepper {
+    gap: 2px;
+  }
+  .wf-editor,
+  .wf-wizard,
+  .wf-detail {
+    padding: 12px;
+  }
+}
+
+.dialog:has(.wf-wizard),
+.dialog:has(.wf-editor),
+.dialog:has(.wf-detail) {
+  width: 860px;
+}
+.wf-editor label,
+.wf-wizard label {
+  margin: 0;
+}
+.wf-card p {
+  line-height: 1.7;
+}
+.wf-table td {
+  overflow-wrap: anywhere;
+}
+.wf-card a {
+  text-decoration: underline;
+}

@@ -4,7 +4,6 @@ import {
   workspaceNavigation,
   workspaceTabs,
 } from "./workspace";
-import { AutomationPreview } from "./AutomationPreview";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Activity,
@@ -123,6 +122,8 @@ const pages: { id: Page; label: string; en: string; icon: typeof Activity }[] =
     },
     { id: "guide", label: "使用指南", en: "User guide", icon: BookOpen },
   ];
+import { Workflows, WorkflowSection } from "./Workflows";
+
 export function App() {
   const [theme, setTheme] = useState(
     document.documentElement.dataset.theme || "dark",
@@ -427,7 +428,7 @@ export function App() {
     ),
     activeCount = runs.filter((r) => !terminal(r.status)).length;
   const currentPage = pages.find((p) => p.id === page)!;
-  const prototype = page === "automation" || page === "suites";
+  const workflowPage = page === "automation" || page === "suites";
   const tabs = workspaceTabs(page);
   const notifyAction = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
@@ -655,16 +656,16 @@ export function App() {
                 {currentPage.label}
                 <span className="live-tag">
                   <i />
-                  {prototype
-                    ? "交互原型 · 示例数据"
+                  {workflowPage
+                    ? "UCE 工作流"
                     : page === "guide"
                       ? "入门与示例"
                       : "真实实验数据"}
                 </span>
               </h1>
               <p>
-                {prototype
-                  ? "预览自动化验证与问题追踪流程，尚未接入执行服务。"
+                {workflowPage
+                  ? "统一编排性能与自动化测试，保存执行证据并追踪问题。"
                   : page === "guide"
                     ? "从填写 JSON 到发起测试，逐步建立可靠的性能对照。"
                     : page === "issues"
@@ -682,7 +683,7 @@ export function App() {
                                 : "在相同测试条件下，观察版本与时间带来的变化。"}
               </p>
             </div>
-            {!prototype && (
+            {!workflowPage && (
               <button
                 className="primary"
                 disabled={
@@ -762,13 +763,8 @@ export function App() {
               onClick={() => setPage("baselines")}
             />
           )}
-          {prototype && (
-            <AutomationPreview
-              mode={page === "suites" ? "suites" : "runs"}
-              detail={detail}
-              onDetail={setDetail}
-              onNavigate={(next) => setPage(next)}
-            />
+          {workflowPage && (
+            <Workflows key={page} mode={page === "suites" ? "cases" : "runs"} />
           )}
           {managementOnly && (
             <div className="alert">
@@ -876,41 +872,45 @@ export function App() {
             </>
           )}
           {page === "cases" && (
-            <Cases
-              tick={tick}
-              createSignal={caseCreate}
-              activeID={detail}
-              setActiveID={setDetail}
-              runs={runs}
-              canStart={executors.length > 0}
-              onStart={(v) => {
-                openModal("start");
-                setStartMode("case");
-                setChosenCase(v);
-                setJSONInput(JSON.stringify(v.plan, null, 2));
-                setRequestId(`case-${crypto.randomUUID()}`);
-              }}
-            />
-          )}
-          {page === "baselines" && (
-            <div hidden={Boolean(detail)}>
-              <PerformanceCatalog
-                environments={environments}
-                versions={versions}
+            <>
+              <Cases
                 tick={tick}
-                onOpen={showRun}
-                onCompare={(a, b, selectedKind) => {
-                  setKind(selectedKind);
-                  setOperation("");
-                  setFileSize("");
-                  setBlockSize("");
-                  setSearch("");
-                  setBaseline(a);
-                  setCandidate(b);
-                  setPage("trends");
+                createSignal={caseCreate}
+                activeID={detail}
+                setActiveID={setDetail}
+                runs={runs}
+                canStart={executors.length > 0}
+                onStart={(v) => {
+                  openModal("start");
+                  setStartMode("case");
+                  setChosenCase(v);
+                  setJSONInput(JSON.stringify(v.plan, null, 2));
+                  setRequestId(`case-${crypto.randomUUID()}`);
                 }}
               />
-            </div>
+            </>
+          )}
+          {page === "baselines" && (
+            <>
+              <div hidden={Boolean(detail)}>
+                <PerformanceCatalog
+                  environments={environments}
+                  versions={versions}
+                  tick={tick}
+                  onOpen={showRun}
+                  onCompare={(a, b, selectedKind) => {
+                    setKind(selectedKind);
+                    setOperation("");
+                    setFileSize("");
+                    setBlockSize("");
+                    setSearch("");
+                    setBaseline(a);
+                    setCandidate(b);
+                    setPage("trends");
+                  }}
+                />
+              </div>
+            </>
           )}
           {page === "versions" && (
             <Versions
@@ -921,24 +921,26 @@ export function App() {
             />
           )}
           {page === "environments" && (
-            <HardwareEnvironments
-              groups={hardwareGroups}
-              detail={detail}
-              onDetail={setDetail}
-              onRun={showRun}
-              onSelectSnapshot={(id) => {
-                const q = new URLSearchParams(location.search);
-                ["hw", "site", "project", "condition"].forEach((k) =>
-                  q.set("catalog_" + k, ""),
-                );
-                q.set("catalog_snapshot", id);
-                q.set("catalog_offset", "0");
-                q.set("catalog_mode", "overview");
-                history.replaceState(null, "", `?${q}`);
-                chooseEnvironment(id);
-                setPage("runs");
-              }}
-            />
+            <WorkflowSection mode="settings">
+              <HardwareEnvironments
+                groups={hardwareGroups}
+                detail={detail}
+                onDetail={setDetail}
+                onRun={showRun}
+                onSelectSnapshot={(id) => {
+                  const q = new URLSearchParams(location.search);
+                  ["hw", "site", "project", "condition"].forEach((k) =>
+                    q.set("catalog_" + k, ""),
+                  );
+                  q.set("catalog_snapshot", id);
+                  q.set("catalog_offset", "0");
+                  q.set("catalog_mode", "overview");
+                  history.replaceState(null, "", `?${q}`);
+                  chooseEnvironment(id);
+                  setPage("runs");
+                }}
+              />
+            </WorkflowSection>
           )}
           {page === "trends" && (
             <>

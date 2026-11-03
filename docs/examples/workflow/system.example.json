@@ -1,0 +1,11 @@
+{
+  "name": "示例文件系统集群",
+  "description": "替换为已登记、实际验收的环境与软件版本 ID",
+  "base_revision": 0,
+  "change_note": "首次登记",
+  "body": {
+    "environment_id": "replace-environment-id",
+    "software_version_id": "replace-version-id",
+    "settings": {}
+  }
+}

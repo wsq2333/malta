@@ -1,0 +1,16 @@
+{
+  "case": {
+    "id": "replace-case-id",
+    "revision": 1
+  },
+  "system": {
+    "id": "replace-system-id",
+    "revision": 1
+  },
+  "profile": {
+    "id": "replace-profile-id",
+    "revision": 1
+  },
+  "version_id": "replace-version-id",
+  "parameters": {}
+}

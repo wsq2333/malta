@@ -1,0 +1,23 @@
+{
+  "name": "sample dev UCE 固定客户端",
+  "description": "占位示例，不能直接提交真实测试",
+  "base_revision": 0,
+  "change_note": "首次登记",
+  "body": {
+    "backend": "uce",
+    "connection": "sample-dev-uce",
+    "system_ids": [
+      "replace-system-id"
+    ],
+    "cluster": "sample-dev",
+    "namespace": "malta-workflows",
+    "node": "replace-client-node",
+    "queue": "default",
+    "subtype": "malta",
+    "settings": {
+      "results_pvc": "replace-rwx-nas-pvc",
+      "results_mount": "/mnt/uce/uce-runtime",
+      "node": "replace-client-node"
+    }
+  }
+}

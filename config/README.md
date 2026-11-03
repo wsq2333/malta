@@ -1,11 +1,12 @@
 # 本地配置
 
-此目录保存环境相关连接、应用参数和未来 LLM 凭证。Git 默认忽略这里的所有内容，仅允许提交本说明和下列四个指定示例文件。真实配置、证书、密钥、备份和新增子目录都不提交；不要把真实值填入示例，也不要用 `git add -f` 绕过规则。
+此目录保存环境相关连接、应用参数和未来 LLM 凭证。Git 默认忽略这里的所有内容，仅允许提交本说明和下列指定示例文件。真实配置、证书、密钥、备份和新增子目录都不提交；不要把真实值填入示例，也不要用 `git add -f` 绕过规则。
 
 | 路径 | 用途 | 当前支持情况 |
 | --- | --- | --- |
 | `deploy/kubeconfig.example.yaml` | 部署与测试集群的地址、CA、用户和 context | kubectl 标准 kubeconfig |
 | `parameter/executor.example.yaml` | 测试节点、PVC、Runner 镜像与资源预算 | `serve --kubernetes-config` 可加载 YAML 或 JSON |
+| `parameter/workflow.example.yaml` | UCE 连接、路由范围、结果卷映射与预算；Token 只引用文件 | `serve --workflow-config` 可加载 YAML 或 JSON |
 | `parameter/application.example.yaml` | 服务与本地 Runner 参数 | 预留模板，当前需手动传 CLI flag |
 | `llm/providers.example.yaml` | 供应商、模型、API 地址与密钥来源 | 预留模板，当前未接入 LLM 加载器 |
 
@@ -52,3 +53,7 @@ git status --short --untracked-files=all -- config
 ```
 
 第一条应列出全部四个真实配置路径；第二条只能出现指定示例与说明的修改。新增可提交示例时，需要同步更新根目录 `.gitignore` 的白名单并检查内容。
+
+## UCE 工作流执行
+
+复制 `parameter/workflow.example.yaml` 为 `parameter/workflow.yaml`，配置经管理员验收的路由和共享结果卷；真实 Token 放在受限文件或 Kubernetes Secret 中。启动参数为 `serve --workflow-config config/parameter/workflow.yaml`。不要同时使用 `--management-only`。详细部署前提、用例和结果协议见[工作流测试](../docs/workflows.md)。此改动不自动部署 UCE 或创建 PVC。
