@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | `deploy/kubeconfig.example.yaml` | 部署与测试集群的地址、CA、用户和 context | kubectl 标准 kubeconfig |
 | `parameter/executor.example.yaml` | 测试节点、PVC、Runner 镜像与资源预算 | `serve --kubernetes-config` 可加载 YAML 或 JSON |
+| `parameter/workflow-backends.example.yaml` | 多后端连接、自动获取/刷新 Token，凭据引用 Secret 文件 | 新版 `serve --workflow-config` 可加载，默认未启用 |
 | `parameter/workflow.example.yaml` | UCE 连接、路由范围、结果卷映射与预算；Token 只引用文件 | `serve --workflow-config` 可加载 YAML 或 JSON |
 | `parameter/application.example.yaml` | 服务与本地 Runner 参数 | 预留模板，当前需手动传 CLI flag |
 | `llm/providers.example.yaml` | 供应商、模型、API 地址与密钥来源 | 预留模板，当前未接入 LLM 加载器 |

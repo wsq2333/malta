@@ -1,9 +1,10 @@
-// Package backend is the framework boundary. Only UCE is implemented today.
+// Package backend is the framework boundary. UCE and Argo implement the same lifecycle and evidence interface.
 package backend
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 type Stage struct {
@@ -14,6 +15,8 @@ type Stage struct {
 	Status        string `json:"status"`
 }
 type Observation struct {
+	EvidenceError       string          `json:"evidence_error,omitempty"`
+	StageDetails        json.RawMessage `json:"stage_details,omitempty"`
 	RunID               string          `json:"run_id"`
 	VersionID           string          `json:"workflow_version_id"`
 	Status              string          `json:"status"`
@@ -46,3 +49,10 @@ type Backend interface {
 	CancellationComplete(context.Context, string) (bool, error)
 	Outputs(context.Context, string, Stage) ([]Output, error)
 }
+
+type HTTPError struct {
+	Status int
+	Code   string
+}
+
+func (e *HTTPError) Error() string { return fmt.Sprintf("backend HTTP %d (%s)", e.Status, e.Code) }

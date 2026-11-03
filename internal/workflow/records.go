@@ -51,8 +51,8 @@ func (m *Manager) Save(kind string, q SaveRecord) (Record, error) {
 		if e := domain.DecodeJSON(strings.NewReader(string(q.Body)), &p); e != nil {
 			return r, domain.E("invalid", e.Error())
 		}
-		if p.Backend != "uce" || p.Connection == "" || p.Cluster == "" || p.Namespace == "" || p.Node == "" || len(p.SystemIDs) == 0 {
-			return r, domain.E("invalid", "UCE profile requires connection, cluster, namespace, node and allowed systems")
+		if (p.Backend != "uce" && p.Backend != "argo") || p.Connection == "" || p.Cluster == "" || p.Namespace == "" || len(p.SystemIDs) == 0 {
+			return r, domain.E("invalid", "workflow profile requires connection, cluster, namespace, node and allowed systems")
 		}
 	}
 	if q.ID == "" {
@@ -143,10 +143,16 @@ func (m *Manager) getBy(column, value string) (Run, error) {
 	return r, e
 }
 func (m *Manager) Runs(limit, offset int) ([]Run, error) {
+	return m.FilteredRuns(limit, offset, "", "")
+}
+func (m *Manager) FilteredRuns(limit, offset int, kind, connection string) ([]Run, error) {
+	if kind != "" && kind != "uce" && kind != "argo" {
+		return nil, domain.E("invalid", "unknown backend filter")
+	}
 	if limit < 1 || limit > 100 || offset < 0 {
 		return nil, domain.E("invalid", "limit 1..100, offset nonnegative")
 	}
-	rows, e := m.Store.DB.Query("SELECT body FROM workflow_runs ORDER BY json_extract(body,'$.created_at') DESC,id DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, e := m.Store.DB.Query("SELECT body FROM workflow_runs WHERE (?='' OR json_extract(body,'$.snapshot.profile.body.backend')=?) AND (?='' OR json_extract(body,'$.snapshot.profile.body.connection')=?) ORDER BY json_extract(body,'$.created_at') DESC,id DESC LIMIT ? OFFSET ?", kind, kind, connection, connection, limit, offset)
 	if e != nil {
 		return nil, e
 	}

@@ -27,3 +27,5 @@ coverage.out
 !/config/llm/providers.example.yaml
 
 !/config/parameter/workflow.example.yaml
+
+!/config/parameter/workflow-backends.example.yaml

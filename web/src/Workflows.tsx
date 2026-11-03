@@ -2,8 +2,57 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api, date } from "./model";
 import { Dialog, Empty } from "./components";
 import example from "./workflow-example.json";
+import nativeUCE from "./workflow-native-uce.json";
 import "./workflow.css";
 import { WorkflowIssues } from "./WorkflowIssues";
+
+type Connection = {
+  id: string;
+  backend: string;
+  url: string;
+  cluster: string;
+  namespace: string;
+  enabled: boolean;
+  available: boolean;
+  auth_type: string;
+  auth_status: string;
+};
+const supportedBackends = (body: Record<string, any>) =>
+  body.implementations
+    ? Object.keys(body.implementations)
+    : [body.backend || "uce"];
+const connectionStatus = (c: Connection) =>
+  !c.enabled
+    ? "未启用"
+    : c.auth_status === "credentials_missing"
+      ? "待配置 Secret"
+      : "凭据已配置 · 提交前验证";
+const nativeCase = (backend: string) => ({
+  schema_version: "workflow/v1alpha1",
+  backend,
+  template:
+    backend === "uce"
+      ? nativeUCE.body.template
+      : {
+          apiVersion: "argoproj.io/v1alpha1",
+          kind: "WorkflowTemplate",
+          metadata: { name: "hello" },
+          spec: {
+            entrypoint: "hello",
+            templates: [
+              {
+                name: "hello",
+                container: {
+                  image: "alpine:3.20",
+                  command: ["sh", "-c"],
+                  args: ["echo hello from Malta"],
+                },
+              },
+            ],
+          },
+        },
+  timeout_seconds: 600,
+});
 
 type Ref = { id: string; revision: number };
 type RecordValue = {
@@ -80,6 +129,8 @@ const labels: Record<string, string> = {
   missing: "缺失",
   invalid: "无效",
   skipped: "跳过",
+  not_configured: "未配置解析",
+  not_evaluated: "未评估",
 };
 const label = (s: string) => labels[s] || s;
 const ref = (r: RecordValue): Ref => ({ id: r.id, revision: r.revision });
@@ -118,7 +169,7 @@ export function WorkflowSection({
           aria-selected={active}
           onClick={() => setActive(true)}
         >
-          {mode === "settings" ? "被测系统与执行配置" : "工作流测试 · UCE"}
+          {mode === "settings" ? "被测系统与执行配置" : "工作流测试"}
         </button>
       </div>
       {active ? <Workflows mode={mode} /> : children}
@@ -126,6 +177,22 @@ export function WorkflowSection({
   );
 }
 export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [backendFilter, setBackendFilter] = useState("");
+  const [connectionFilter, setConnectionFilter] = useState("");
+  useEffect(() => {
+    let live = true;
+    api<Connection[]>("/workflow/connections")
+      .then((v) => {
+        if (live) setConnections(v);
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [mode]);
   const [records, setRecords] = useState<RecordValue[]>([]),
     [kind, setKind] = useState(mode === "settings" ? "systems" : "cases"),
     [error, setError] = useState(""),
@@ -159,11 +226,11 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
     setError("");
     const p =
       mode === "runs"
-        ? api<WorkflowRun[]>(`/workflow/runs?limit=20&offset=${offset}`).then(
-            (v) => {
-              if (live) setRuns(v);
-            },
-          )
+        ? api<WorkflowRun[]>(
+            `/workflow/runs?limit=20&offset=${offset}&backend=${encodeURIComponent(backendFilter)}&connection=${encodeURIComponent(connectionFilter)}`,
+          ).then((v) => {
+            if (live) setRuns(v);
+          })
         : api<RecordValue[]>(`/workflow/records/${kind}`).then((v) => {
             if (live) setRecords(v);
           });
@@ -173,7 +240,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
     return () => {
       live = false;
     };
-  }, [mode, kind, tick, offset]);
+  }, [mode, kind, tick, offset, backendFilter, connectionFilter]);
   useEffect(() => {
     if (mode !== "runs") return;
     const t = setInterval(() => setTick((x) => x + 1), 5000);
@@ -218,7 +285,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
     <section className="wf-workspace">
       <div className="wf-heading">
         <div>
-          <span className="eyebrow">WORKFLOW / UCE</span>
+          <span className="eyebrow">NATIVE WORKFLOWS</span>
           <h2>
             {mode === "cases"
               ? "可复用的工作流用例"
@@ -228,7 +295,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           </h2>
           <p>
             {mode === "cases"
-              ? "完整 EP、参数和验收标准随版本保存。"
+              ? "原生 EP / Argo 模板随版本保存，结果解析可选。"
               : mode === "runs"
                 ? "分别查看执行状态、证据完整性和验证结论。"
                 : "引用已登记的硬件与软件版本；连接凭据由服务端管理。"}
@@ -236,6 +303,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
         </div>
         <button
           className="primary"
+          disabled={mode === "runs" && !connections.some((c) => c.available)}
           onClick={() => (mode === "runs" ? setWizard(null) : setEditing(null))}
         >
           {mode === "runs"
@@ -245,6 +313,27 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
               : "新建配置"}
         </button>
       </div>
+      {(mode === "runs" || mode === "settings") && (
+        <div className="wf-connection-status" role="status">
+          {connections.length === 0 ? (
+            <p>
+              尚未配置工作流入口。请挂载 ConfigMap 和认证 Secret 后启用后端。
+            </p>
+          ) : (
+            connections.map((c) => (
+              <span key={c.id}>
+                <strong>
+                  {c.backend.toUpperCase()} · {c.id}
+                </strong>{" "}
+                — {connectionStatus(c)}
+              </span>
+            ))
+          )}
+          {!connections.some((c) => c.backend === "argo") && (
+            <span>Argo：尚未配置入口</span>
+          )}
+        </div>
+      )}
       {mode === "settings" && (
         <div className="wf-tabs">
           <button
@@ -278,7 +367,9 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
             <article className="wf-card" key={r.id}>
               <span className="wf-tag">
                 {kind === "cases"
-                  ? "UCE EP"
+                  ? supportedBackends(r.body)
+                      .map((v) => v.toUpperCase())
+                      .join(" / ")
                   : kind === "systems"
                     ? "被测系统"
                     : "执行配置"}{" "}
@@ -341,7 +432,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           </div>
           <h3>{selected.name}</h3>
           <p>{selected.description}</p>
-          {kind === "cases" && <DAG template={selected.body.template} />}
+          {kind === "cases" && <TemplatePreview body={selected.body} />}
           <details>
             <summary>完整定义、模板与结果契约</summary>
             <pre>{pretty(selected.body)}</pre>
@@ -350,11 +441,48 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
       )}
       {mode === "runs" && (
         <>
+          <div className="wf-filters">
+            <label>
+              执行后端
+              <select
+                value={backendFilter}
+                onChange={(e) => {
+                  setBackendFilter(e.target.value);
+                  setConnectionFilter("");
+                  setOffset(0);
+                }}
+              >
+                <option value="">全部后端</option>
+                <option value="uce">UCE</option>
+                <option value="argo">Argo</option>
+              </select>
+            </label>
+            <label>
+              执行入口
+              <select
+                value={connectionFilter}
+                onChange={(e) => {
+                  setConnectionFilter(e.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="">全部入口</option>
+                {connections
+                  .filter((c) => !backendFilter || c.backend === backendFilter)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.id} · {c.cluster || "待配置路由"}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
           <div className="wf-table-wrap">
             <table className="wf-table">
               <thead>
                 <tr>
                   <th>测试 / 环境</th>
+                  <th>后端 / 入口</th>
                   <th>时间</th>
                   <th>执行</th>
                   <th>证据</th>
@@ -370,6 +498,10 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
                       <small>
                         {r.snapshot.system.name} · {r.snapshot.version.label}
                       </small>
+                    </td>
+                    <td>
+                      {r.snapshot.profile.body.backend?.toUpperCase()}
+                      <small>{r.snapshot.profile.body.connection}</small>
                     </td>
                     <td>{date(r.created_at)}</td>
                     <td>
@@ -410,7 +542,15 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
               </tbody>
             </table>
           </div>
-          {runs.length === 0 && <Empty title="还没有工作流运行" />}
+          {runs.length === 0 && (
+            <Empty
+              title={
+                backendFilter || connectionFilter
+                  ? "当前筛选下没有运行"
+                  : "还没有工作流运行"
+              }
+            />
+          )}
           <div className="wf-actions">
             <button
               disabled={!offset}
@@ -467,8 +607,15 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
         <Dialog title={run.snapshot.case.name} onClose={() => setRun(null)}>
           <div className="wf-detail">
             <p>
-              {run.snapshot.system.name} · {run.snapshot.version.label}
+              {run.snapshot.system.name} · {run.snapshot.version.label} ·{" "}
+              {run.snapshot.profile.body.backend?.toUpperCase()} /{" "}
+              {run.snapshot.profile.body.connection}
             </p>
+            {run.result_state === "not_configured" && (
+              <p className="wf-notice">
+                此运行未配置结果解析，只记录执行状态；“执行成功”不等于测试通过。
+              </p>
+            )}
             <div className="wf-facts">
               <span>
                 执行：
@@ -567,23 +714,27 @@ async function downloadArtifact(id: string, name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(u), 1000);
 }
-function DAG({ template }: { template: any }) {
-  const nodes = template?.dag_definitions?.[0]?.nodes || [];
-  const names = new Map(nodes.map((n: any) => [n.definition_node_id, n.name]));
+function TemplatePreview({ body }: { body: Record<string, any> }) {
   return (
-    <div className="wf-dag" aria-label="工作流依赖">
-      {nodes.map((n: any) => (
-        <div className="wf-node" key={n.definition_node_id}>
-          <small>
-            {(n.input_path || [])
-              .map((p: any) => names.get(p.from_node) || p.from_node)
-              .join(" + ") || "起点"}{" "}
-            →
-          </small>
-          <strong>{n.name}</strong>
-        </div>
+    <div>
+      {supportedBackends(body).map((kind) => (
+        <details key={kind}>
+          <summary>{kind.toUpperCase()} 原生模板</summary>
+          <pre>
+            {pretty(body.implementations?.[kind]?.template || body.template)}
+          </pre>
+        </details>
       ))}
     </div>
+  );
+}
+function DAG({ template }: { template: any }) {
+  // Display the native definition rather than maintaining another DAG interpreter.
+  return (
+    <details>
+      <summary>原生模板（由执行后端解释）</summary>
+      <pre>{pretty(template)}</pre>
+    </details>
   );
 }
 function RecordEditor({
@@ -599,7 +750,7 @@ function RecordEditor({
 }) {
   const defaults =
     kind === "cases"
-      ? example.body
+      ? nativeCase("uce")
       : kind === "systems"
         ? { environment_id: "", software_version_id: "", settings: {} }
         : {
@@ -668,6 +819,19 @@ function RecordEditor({
       onClose={onClose}
     >
       <div className="wf-editor">
+        {kind === "cases" && (
+          <div className="wf-actions">
+            <button onClick={() => setJSON(pretty(nativeCase("uce")))}>
+              UCE 原生模板示例
+            </button>
+            <button onClick={() => setJSON(pretty(nativeCase("argo")))}>
+              Argo 原生模板示例
+            </button>
+            <button onClick={() => setJSON(pretty(example.body))}>
+              附带结果解析示例
+            </button>
+          </div>
+        )}
         {references !== null && (
           <details>
             <summary>查看可引用的已登记配置（ID）</summary>
@@ -700,7 +864,22 @@ function RecordEditor({
                 const f = e.target.files?.[0];
                 if (!f) return;
                 const v = JSON.parse(await f.text());
-                setJSON(pretty(v.body || v));
+                const data = v.body || v;
+                if (
+                  kind === "cases" &&
+                  (data.root_dag_version_id ||
+                    data.apiVersion === "argoproj.io/v1alpha1")
+                ) {
+                  setJSON(
+                    pretty({
+                      schema_version: "workflow/v1alpha1",
+                      backend: data.root_dag_version_id ? "uce" : "argo",
+                      template: data,
+                      timeout_seconds: 600,
+                    }),
+                  );
+                  if (data.metadata?.name) setName(data.metadata.name);
+                } else setJSON(pretty(data));
                 if (v.name) setName(v.name);
                 if (v.description) setDescription(v.description);
               } catch (e) {
@@ -711,7 +890,7 @@ function RecordEditor({
         </label>
         <label>
           {kind === "cases"
-            ? "完整模板、参数与结果契约"
+            ? "原生模板、可选参数与结果解析"
             : "配置 JSON（不要填写凭据）"}
           <textarea
             className="wf-code"
@@ -722,7 +901,10 @@ function RecordEditor({
         </label>
         {kind === "cases" && (
           <p>
-            示例仅验证算术断言和证据回收，不是性能测试。运行前配置工具镜像、真实路由和结果卷。
+            可直接导入 EP 或 Argo 原生 JSON；不配置 results
+            时仅记录执行状态。账号密码由服务端 Secret
+            管理，不填入模板。多后端用例通过 implementations
+            分别保存原生模板，共用参数定义。
           </p>
         )}
         {error && (
@@ -746,6 +928,9 @@ function Wizard({
   onClose: () => void;
   onStarted: (r: WorkflowRun) => void;
 }) {
+  const [parametersValid, setParametersValid] = useState(true);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [executionBackend, setExecutionBackend] = useState("");
   const [step, setStep] = useState(0),
     [cases, setCases] = useState<RecordValue[]>([]),
     [systems, setSystems] = useState<RecordValue[]>([]),
@@ -770,13 +955,15 @@ function Wizard({
       api<RecordValue[]>("/workflow/records/systems"),
       api<RecordValue[]>("/workflow/records/profiles"),
       api<{ id: string; label: string }[]>("/versions"),
+      api<Connection[]>("/workflow/connections"),
     ])
-      .then(([c, s, p, v]) => {
+      .then(([c, s, p, v, connections]) => {
         if (live) {
           setCases(c);
           setSystems(s);
           setProfiles(p);
           setVersions(v);
+          setConnections(connections);
         }
       })
       .catch((e) => {
@@ -803,6 +990,14 @@ function Wizard({
       live = false;
     };
   }, [initial]);
+  useEffect(() => {
+    setParametersValid(true);
+    setProfile(null);
+    setExecutionBackend(supportedBackends(chosen?.body || {})[0] || "");
+  }, [chosen]);
+  const selectedConnection = connections.find(
+    (c) => c.id === profile?.body.connection,
+  );
   const steps = [
     "用例版本",
     "被测系统",
@@ -815,9 +1010,9 @@ function Wizard({
   const valid = [
     !!chosen,
     !!system,
-    !!profile,
+    !!profile && !!selectedConnection?.available,
     !!version,
-    true,
+    parametersValid,
     !!check?.ready,
     true,
   ][step];
@@ -920,7 +1115,7 @@ function Wizard({
                 ))}
               </select>
             </label>
-            {chosen && <DAG template={chosen.body.template} />}
+            {chosen && <TemplatePreview body={chosen.body} />}
           </>
         )}
         {step === 1 && (
@@ -945,26 +1140,80 @@ function Wizard({
           </label>
         )}
         {step === 2 && (
-          <label>
-            兼容执行配置
-            <select
-              value={profile?.id || ""}
-              onChange={(e) =>
-                setProfile(
-                  profiles.find((p) => p.id === e.target.value) || null,
-                )
-              }
-            >
-              <option value="">选择配置</option>
-              {profiles
-                .filter((p) => p.body.system_ids?.includes(system?.id))
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} · {p.body.cluster} / {p.body.node}
+          <>
+            <label>
+              执行后端
+              <select
+                value={executionBackend}
+                onChange={(e) => {
+                  setExecutionBackend(e.target.value);
+                  setProfile(null);
+                }}
+              >
+                {["uce", "argo"].map((kind) => (
+                  <option
+                    key={kind}
+                    value={kind}
+                    disabled={
+                      !supportedBackends(chosen?.body || {}).includes(kind)
+                    }
+                  >
+                    {kind.toUpperCase()}
+                    {!supportedBackends(chosen?.body || {}).includes(kind)
+                      ? " · 此用例版本无对应模板"
+                      : !connections.some(
+                            (c) => c.backend === kind && c.available,
+                          )
+                        ? " · 暂无可用入口"
+                        : ""}
                   </option>
                 ))}
-            </select>
-          </label>
+              </select>
+            </label>
+            <label>
+              执行配置
+              <select
+                value={profile?.id || ""}
+                onChange={(e) =>
+                  setProfile(
+                    profiles.find((p) => p.id === e.target.value) || null,
+                  )
+                }
+              >
+                <option value="">选择配置</option>
+                {profiles
+                  .filter(
+                    (p) =>
+                      p.body.backend === executionBackend &&
+                      p.body.system_ids?.includes(system?.id),
+                  )
+                  .map((p) => {
+                    const c = connections.find(
+                      (c) =>
+                        c.id === p.body.connection &&
+                        c.backend === p.body.backend,
+                    );
+                    return (
+                      <option key={p.id} value={p.id} disabled={!c?.available}>
+                        {p.name} · {p.body.cluster} / {p.body.namespace} ·{" "}
+                        {c ? connectionStatus(c) : "入口未配置"}
+                      </option>
+                    );
+                  })}
+              </select>
+            </label>
+            <p>
+              提交后固定后端和模板版本。切换配置会清除预检查，需要重新验证。
+            </p>
+            {selectedConnection && (
+              <p>
+                入口：{selectedConnection.url}
+                <br />
+                认证：{selectedConnection.auth_type} ·{" "}
+                {connectionStatus(selectedConnection)}
+              </p>
+            )}
+          </>
         )}
         {step === 3 && (
           <>
@@ -987,13 +1236,24 @@ function Wizard({
         )}
         {step === 4 && (
           <>
-            <ParameterForm
-              schema={chosen?.body.parameters}
-              values={params}
-              onChange={setParams}
-            />
+            {chosen?.body.parameters ? (
+              <ParameterForm
+                schema={chosen.body.parameters}
+                values={params}
+                onChange={setParams}
+              />
+            ) : (
+              <NativeParameters
+                values={params}
+                onChange={setParams}
+                onValid={setParametersValid}
+              />
+            )}
             <p>
-              未在参数 Schema 中声明的字段不能提交。malta_context 由服务注入。
+              {chosen?.body.parameters
+                ? "未在参数 Schema 中声明的字段不能提交。"
+                : "参数由执行后端校验。"}
+              malta_context 是保留字段，仅当模板声明时由服务注入。
             </p>
           </>
         )}
@@ -1044,7 +1304,10 @@ function Wizard({
                 onChange={(e) => setRequest(e.target.value)}
               />
             </label>
-            <p>网络重试保持此 ID。提交后先注册 EP，再创建 UCE 工作流。</p>
+            <p>
+              网络重试保持此
+              ID。原生模板由所选后端校验、登记并执行。未配置解析器时只记录执行状态。
+            </p>
             <button
               className="primary"
               disabled={busy || !check?.ready || !request}
@@ -1235,5 +1498,46 @@ function ComparisonView({ value }: { value: Comparison }) {
         </div>
       )}
     </section>
+  );
+}
+
+function NativeParameters({
+  values,
+  onChange,
+  onValid,
+}: {
+  values: Record<string, any>;
+  onChange: (v: Record<string, any>) => void;
+  onValid: (valid: boolean) => void;
+}) {
+  const [text, setText] = useState(pretty(values));
+  const [error, setError] = useState("");
+  useEffect(() => {
+    // On remount the editor starts from the last valid parameter object.
+    onValid(true);
+  }, [onValid]);
+  return (
+    <label>
+      原生输入参数 JSON
+      <textarea
+        className="wf-code"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          try {
+            const v = JSON.parse(e.target.value);
+            if (!v || Array.isArray(v) || typeof v !== "object")
+              throw new Error("参数必须是 JSON 对象");
+            onChange(v);
+            onValid(true);
+            setError("");
+          } catch (err) {
+            onValid(false);
+            setError((err as Error).message);
+          }
+        }}
+      />
+      {error && <span role="alert">{error}</span>}
+    </label>
   );
 }

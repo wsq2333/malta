@@ -226,3 +226,32 @@
 .wf-card a {
   text-decoration: underline;
 }
+
+.wf-connection-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.wf-connection-status span {
+  display: block;
+}
+.wf-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.wf-filters label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.wf-notice {
+  border-left: 3px solid #72a18b;
+  padding: 12px 16px;
+}

@@ -244,7 +244,7 @@ func TestPreflightRejectsPlacementAndChangedConnection(t *testing.T) {
 	record, _ := m.Record("profiles", q.Profile)
 	var profile Profile
 	_ = json.Unmarshal(record.Body, &profile)
-	profile.Settings["node"] = "wrong-node"
+	profile.Node = "wrong-node"
 	record.Body, _ = json.Marshal(profile)
 	saved, e := m.Save("profiles", SaveRecord{ID: record.ID, BaseRevision: 1, Name: record.Name, Body: record.Body})
 	if e != nil {

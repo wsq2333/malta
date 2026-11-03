@@ -7,23 +7,28 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/wsq2333/malta/internal/backend"
+	"github.com/wsq2333/malta/internal/backend/argo"
+	"github.com/wsq2333/malta/internal/backend/auth"
+	"github.com/wsq2333/malta/internal/backend/httpapi"
 	"github.com/wsq2333/malta/internal/backend/uce"
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/store"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 )
 
 type Config struct {
-	Connections []uce.Config `json:"connections"`
+	Connections []backend.Config `json:"connections"`
 }
 type Manager struct {
 	Store       *store.Store
-	connections map[string]uce.Config
+	connections map[string]backend.Config
 	backends    map[string]backend.Backend
+	credentials map[string]*auth.Provider
 	enabled     bool
 	ctx         context.Context
 	stop        context.CancelFunc
@@ -31,43 +36,117 @@ type Manager struct {
 	mu          sync.Mutex
 }
 
-func connectionHash(c uce.Config) string { c.TokenFile = ""; return domain.Hash(c) }
+func connectionHash(c backend.Config) string {
+	c.TokenFile = ""
+	if c.Auth != nil {
+		a := *c.Auth
+		a.TokenFile = ""
+		a.UsernameFile = ""
+		a.PasswordFile = ""
+		a.ClientSecretFile = ""
+		c.Auth = &a
+	}
+	return domain.Hash(c)
+}
 func New(s *store.Store, c Config, enabled bool) (*Manager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	m := &Manager{Store: s, connections: map[string]uce.Config{}, backends: map[string]backend.Backend{}, enabled: enabled, ctx: ctx, stop: cancel, done: make(chan struct{})}
+	m := &Manager{Store: s, connections: map[string]backend.Config{}, backends: map[string]backend.Backend{}, credentials: map[string]*auth.Provider{}, enabled: enabled, ctx: ctx, stop: cancel, done: make(chan struct{})}
 	if e := migrate(s); e != nil {
 		cancel()
 		return nil, e
 	}
 	for _, v := range c.Connections {
-		if domain.CheckID(v.ID) != nil || m.backends[v.ID] != nil || v.Cluster == "" || v.Namespace == "" || len(v.Subtypes) == 0 || v.MaxBytes < 1 || v.TimeoutSeconds < 1 || v.ArtifactBytes < 1 || v.ArtifactBytes > 32<<20 {
+		if domain.CheckID(v.ID) != nil || m.connections[v.ID].ID != "" || (v.Kind() != "uce" && v.Kind() != "argo") {
 			cancel()
-			return nil, domain.E("invalid", "invalid or duplicate UCE connection; artifact budget must be <=32MiB")
+			return nil, domain.E("invalid", "invalid/duplicate connection ID or unsupported backend")
 		}
-		for _, root := range []string{v.RemoteResultsRoot, v.LocalResultsRoot} {
-			if !filepath.IsAbs(root) || filepath.Clean(root) != root || root == "/" {
-				cancel()
-				return nil, domain.E("invalid", "result roots must be clean absolute non-root paths")
-			}
-		}
-		b, e := uce.New(v)
+		// Disabled entries may reserve an endpoint before routes and credentials exist.
+		h, e := httpapi.New(v)
 		if e != nil {
 			cancel()
 			return nil, e
 		}
 		m.connections[v.ID] = v
-		m.backends[v.ID] = b
+		m.credentials[v.ID] = h.Auth
+		if !v.Active() {
+			continue
+		}
+		if v.Cluster == "" || v.Namespace == "" || (v.Kind() == "uce" && len(v.Subtypes) == 0) || v.MaxBytes < 1 || v.TimeoutSeconds < 1 || v.TimeoutSeconds > 86400 || v.ArtifactBytes < 1 || v.ArtifactBytes > 32<<20 {
+			cancel()
+			return nil, domain.E("invalid", "invalid workflow route or budget")
+		}
+		for _, root := range []string{v.RemoteResultsRoot, v.LocalResultsRoot} {
+			if root == "" {
+				continue
+			}
+			if !filepath.IsAbs(root) || filepath.Clean(root) != root || root == "/" {
+				cancel()
+				return nil, domain.E("invalid", "result roots must be clean absolute non-root paths")
+			}
+		}
+		if v.Kind() == "uce" {
+			client, e := uce.New(v)
+			if e != nil {
+				cancel()
+				return nil, e
+			}
+			m.backends[v.ID] = client
+			m.credentials[v.ID] = client.Auth
+		} else {
+			client, e := argo.New(v)
+			if e != nil {
+				cancel()
+				return nil, e
+			}
+			m.backends[v.ID] = client
+			m.credentials[v.ID] = client.Auth
+		}
 	}
 	go m.loop()
 	return m, nil
 }
 func (m *Manager) Close()        { m.stop(); <-m.done }
 func (m *Manager) Enabled() bool { return m.enabled && len(m.backends) > 0 }
+func (m *Manager) BackendEnabled(kind string) bool {
+	if m == nil || !m.enabled {
+		return false
+	}
+	for id, c := range m.connections {
+		if c.Kind() == kind && m.backends[id] != nil {
+			return true
+		}
+	}
+	return false
+}
+func (m *Manager) credential(c backend.Config) (*auth.Provider, error) {
+	if p := m.credentials[c.ID]; p != nil {
+		return p, nil
+	}
+	a, e := c.AuthConfig()
+	if e != nil {
+		return nil, e
+	}
+	return auth.New(a)
+}
 func (m *Manager) Connections() []map[string]any {
 	out := []map[string]any{}
 	for _, c := range m.connections {
-		out = append(out, map[string]any{"id": c.ID, "backend": "uce", "cluster": c.Cluster, "namespace": c.Namespace, "subtypes": c.Subtypes, "max_bytes": c.MaxBytes, "timeout_seconds": c.TimeoutSeconds})
+		state := "credentials_missing"
+		p, e := m.credential(c)
+		if e == nil {
+			state = p.Status()
+		}
+		if !c.Active() {
+			state = "disabled"
+		}
+		a, _ := c.AuthConfig()
+		kind := a.Type
+		if kind == "" {
+			kind = "bearer_token_file"
+		}
+		out = append(out, map[string]any{"id": c.ID, "backend": c.Kind(), "url": c.URL, "cluster": c.Cluster, "namespace": c.Namespace, "subtypes": c.Subtypes, "max_bytes": c.MaxBytes, "timeout_seconds": c.TimeoutSeconds, "enabled": c.Active() && m.enabled, "available": c.Active() && m.enabled && state == "configured", "auth_type": kind, "auth_status": state})
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i]["id"].(string) < out[j]["id"].(string) })
 	return out
 }
 func (m *Manager) Preflight(q Selection) (Preflight, error) {
@@ -76,25 +155,35 @@ func (m *Manager) Preflight(q Selection) (Preflight, error) {
 		return Preflight{}, e
 	}
 	p := Preflight{ID: domain.ID("check"), ExpiresAt: time.Now().UTC().Add(10 * time.Minute), Ready: m.Enabled(), Snapshot: s, Checks: []Check{
-		{"模板与参数", "passed", "完整 EP、路径依赖、参数与结果契约已校验；UCE 注册仍执行服务端语义校验"},
+		{"模板与参数", "passed", "模板封装、参数与可选结果规则已校验；原生 DAG 语义由后端校验"},
 		{"环境绑定", "passed", "已核对已登记系统、软件版本及执行配置；不是实时集群探测"},
 		{"预算", "passed", fmt.Sprintf("准备数据 %d 字节，执行期限 %d 秒；终态后证据回收最多另等 120 秒", s.PreparedBytes, s.Definition.TimeoutSeconds)},
-		{"现场事实", "warning", "提交前须由管理员核验 UCE 路由、PVC、软件实际版本及凭据权限；本步骤不创建探测 Pod"},
+		{"现场事实", "warning", "提交前须由管理员核验 执行路由、PVC、软件实际版本及凭据权限；本步骤不创建探测 Pod"},
 	}}
 	var profile Profile
 	_ = json.Unmarshal(s.Profile.Body, &profile)
 	cfg := m.connections[profile.Connection]
-	if token, e := os.ReadFile(cfg.TokenFile); e != nil || strings.TrimSpace(string(token)) == "" {
-		p.Ready = false
-		p.Checks = append(p.Checks, Check{"UCE 凭据", "failed", "服务端 Token 文件不可读取或为空"})
-	} else {
-		p.Checks = append(p.Checks, Check{"UCE 凭据", "passed", "Token 文件可读取；实际权限由 UCE 注册与提交接口验证"})
+	provider, authErr := m.credential(cfg)
+	if authErr == nil {
+		ctx, cancel := context.WithTimeout(m.ctx, 15*time.Second)
+		_, authErr = provider.Token(ctx)
+		cancel()
 	}
-	if st, statErr := os.Stat(cfg.LocalResultsRoot); statErr != nil || !st.IsDir() {
+	if authErr != nil {
 		p.Ready = false
-		p.Checks = append(p.Checks, Check{"结果卷", "failed", "服务端结果根目录不可访问"})
+		p.Checks = append(p.Checks, Check{"后端认证", "failed", authErr.Error()})
 	} else {
-		p.Checks = append(p.Checks, Check{"结果卷", "warning", "本地目录可访问；跨 Pod 同卷共享及原子写入需在执行配置验收时确认"})
+		p.Checks = append(p.Checks, Check{"后端认证", "passed", "可取得访问 Token；业务权限由后端接口校验，令牌不写入快照"})
+	}
+	if len(s.Definition.Results) > 0 {
+		if st, statErr := os.Stat(cfg.LocalResultsRoot); statErr != nil || !st.IsDir() {
+			p.Ready = false
+			p.Checks = append(p.Checks, Check{"结果卷", "failed", "服务端结果根目录不可访问"})
+		} else {
+			p.Checks = append(p.Checks, Check{"结果卷", "warning", "本地目录可访问；跨 Pod 同卷共享及原子写入需在执行配置验收时确认"})
+		}
+	} else {
+		p.Checks = append(p.Checks, Check{"结果解析", "warning", "未配置解析器：仅保存后端执行状态与原始详情，不生成测试通过结论"})
 	}
 	if !m.Enabled() {
 		p.Checks = append(p.Checks, Check{"执行后端", "failed", "工作流执行未启用"})
@@ -251,7 +340,7 @@ func (m *Manager) advance(r *Run) {
 	b := m.backends[p.Connection]
 	cfg, ok := m.connections[p.Connection]
 	if !ok || b == nil || connectionHash(cfg) != r.Snapshot.ConnectionHash {
-		r.Error = "UCE connection missing or changed; restore the snapshotted connection to resume"
+		r.Error = "workflow connection missing or changed; restore the snapshotted connection to resume"
 		return
 	}
 	expired := time.Now().After(r.Deadline) && r.CollectionDeadline == nil
@@ -264,7 +353,7 @@ func (m *Manager) advance(r *Run) {
 			r.ExternalRunID = id
 			r.Steps[1].State = "succeeded"
 		} else {
-			var he *uce.HTTPError
+			var he *backend.HTTPError
 			if !errors.As(e, &he) || he.Status != 404 {
 				r.Error = e.Error()
 				return
@@ -288,7 +377,7 @@ func (m *Manager) advance(r *Run) {
 		id, e := b.Register(m.ctx, r.Snapshot.EP)
 		if e != nil {
 			r.Error = e.Error()
-			var he *uce.HTTPError
+			var he *backend.HTTPError
 			if errors.As(e, &he) && he.Status >= 400 && he.Status < 500 && he.Status != 429 {
 				r.Status = "failed"
 				r.Steps[0].State = "failed"
@@ -324,7 +413,7 @@ func (m *Manager) advance(r *Run) {
 		id, e := b.Submit(m.ctx, backend.Submission{VersionID: r.ExternalVersionID, Key: r.Key, Name: r.ID, Inputs: submissionInputs(*r), Queue: p.Queue, Subtype: p.Subtype, TimeoutSeconds: r.Snapshot.Definition.TimeoutSeconds})
 		if e != nil {
 			r.Error = e.Error()
-			var he *uce.HTTPError
+			var he *backend.HTTPError
 			if errors.As(e, &he) && (he.Status == 400 || he.Status == 401 || he.Status == 403 || he.Status == 409 || he.Status == 422) {
 				r.Status = "failed"
 				r.Steps[1].State = "failed"
@@ -342,7 +431,7 @@ func (m *Manager) advance(r *Run) {
 		return
 	}
 	if o.RunID != r.ExternalRunID || o.VersionID != r.ExternalVersionID {
-		r.Error = "UCE execution identity mismatch"
+		r.Error = "workflow execution identity mismatch"
 		return
 	}
 	r.Observations, _ = json.Marshal(o)
@@ -371,6 +460,16 @@ func (m *Manager) advance(r *Run) {
 			return
 		}
 		r.CancelConfirmed = true
+	}
+	if len(r.Snapshot.Definition.Results) == 0 {
+		r.ResultState = "not_configured"
+		r.Verdict = "not_evaluated"
+		r.Status = status
+		if status == "timeout" || r.CancelRequested {
+			r.Status = "cancelled"
+		}
+		r.Steps[3] = Step{"回收并验证结果", "skipped", "未配置结果解析；执行成功不代表测试通过"}
+		return
 	}
 	if r.CollectionDeadline == nil {
 		d := time.Now().UTC().Add(2 * time.Minute)
@@ -412,6 +511,10 @@ func submissionInputs(r Run) map[string]any {
 	for k, x := range r.Snapshot.Inputs {
 		v[k] = x
 	}
-	v["malta_context"] = map[string]any{"malta_run_id": r.ID, "workflow_version_id": r.ExternalVersionID, "snapshot_hash": r.Snapshot.Hash, "environment_id": r.Snapshot.Environment.ID, "software_version_id": r.Snapshot.Version.ID}
+	var template map[string]any
+	_ = json.Unmarshal(r.Snapshot.EP, &template)
+	if declaresContext(template, r.Snapshot.Definition.Backend) {
+		v["malta_context"] = map[string]any{"malta_run_id": r.ID, "workflow_version_id": r.ExternalVersionID, "snapshot_hash": r.Snapshot.Hash, "environment_id": r.Snapshot.Environment.ID, "software_version_id": r.Snapshot.Version.ID}
+	}
 	return v
 }

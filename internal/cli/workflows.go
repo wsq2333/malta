@@ -9,9 +9,9 @@ import (
 )
 
 func workflowCommands(root *cobra.Command, o *Options) {
-	command := &cobra.Command{Use: "workflow", Short: "Manage UCE workflow cases, preflight, submission and verified results"}
+	command := &cobra.Command{Use: "workflow", Short: "Manage native workflow cases, preflight, submission and verified results"}
 	add := func(name, path, method string, args cobra.PositionalArgs, withFile bool) {
-		var file, history string
+		var file, history, backendFilter, connectionFilter string
 		var limit, offset int
 		c := &cobra.Command{Use: name, Args: args, RunE: func(c *cobra.Command, a []string) error {
 			if o.Server == "" {
@@ -26,6 +26,12 @@ func workflowCommands(root *cobra.Command, o *Options) {
 			}
 			if name == "list" {
 				p += fmt.Sprintf("?limit=%d&offset=%d", limit, offset)
+				if backendFilter != "" {
+					p += "&backend=" + url.QueryEscape(backendFilter)
+				}
+				if connectionFilter != "" {
+					p += "&connection=" + url.QueryEscape(connectionFilter)
+				}
 			}
 			if name == "link RUN_ID" || name == "issues RUN_ID" {
 				p += "/issues"
@@ -49,6 +55,8 @@ func workflowCommands(root *cobra.Command, o *Options) {
 			c.Flags().StringVar(&history, "id", "", "List immutable history for this record ID")
 		}
 		if name == "list" {
+			c.Flags().StringVar(&backendFilter, "backend", "", "Filter uce or argo before pagination")
+			c.Flags().StringVar(&connectionFilter, "connection", "", "Filter connection ID before pagination")
 			c.Flags().IntVar(&limit, "limit", 20, "Page size (1..100)")
 			c.Flags().IntVar(&offset, "offset", 0, "Page offset")
 		}

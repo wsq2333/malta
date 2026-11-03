@@ -1,107 +1,40 @@
 package uce
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/wsq2333/malta/internal/backend"
+	"github.com/wsq2333/malta/internal/backend/httpapi"
 	"github.com/wsq2333/malta/internal/domain"
-	"io"
-	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
-type Config struct {
-	ID        string `json:"id"`
-	URL       string `json:"url"`
-	TokenFile string `json:"token_file"`
-	// Roots belong to trusted server configuration, never user-submitted profiles.
-	RemoteResultsRoot string   `json:"remote_results_root"`
-	LocalResultsRoot  string   `json:"local_results_root"`
-	MaxBytes          int64    `json:"max_bytes"`
-	TimeoutSeconds    int      `json:"timeout_seconds"`
-	ArtifactBytes     int64    `json:"artifact_bytes"`
-	Cluster           string   `json:"cluster"`
-	Namespace         string   `json:"namespace"`
-	Subtypes          []string `json:"subtypes"`
-}
+type Config = backend.Config
+type HTTPError = backend.HTTPError
 type Client struct {
 	Config Config
-	HTTP   *http.Client
-}
-type HTTPError struct {
-	Status int
-	Code   string
+	*httpapi.Client
 }
 
-func (e *HTTPError) Error() string { return fmt.Sprintf("UCE HTTP %d (%s)", e.Status, e.Code) }
 func New(c Config) (*Client, error) {
-	u, e := url.Parse(c.URL)
-	if e != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" {
-		return nil, domain.E("invalid", "UCE URL must be an origin without credentials")
+	h, e := httpapi.New(c)
+	if e != nil {
+		return nil, e
 	}
-	if c.TokenFile == "" {
-		return nil, domain.E("invalid", "UCE token_file is required")
-	}
-	return &Client{c, &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{c, h}, nil
 }
-func (c *Client) call(ctx context.Context, method, path, key string, timeout int, body any, out any) error {
-	raw, e := json.Marshal(body)
-	if e != nil {
-		return e
-	}
-	req, e := http.NewRequestWithContext(ctx, method, strings.TrimRight(c.Config.URL, "/")+path, bytes.NewReader(raw))
-	if e != nil {
-		return e
-	}
-	token, e := os.ReadFile(c.Config.TokenFile)
-	if e != nil {
-		return fmt.Errorf("UCE credential file unavailable")
-	}
-	if strings.TrimSpace(string(token)) == "" {
-		return fmt.Errorf("UCE credential file is empty")
-	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
-	req.Header.Set("Content-Type", "application/json")
+func (c *Client) call(ctx context.Context, method, path, key string, timeout int, body, out any) error {
+	headers := map[string]string{}
 	if key != "" {
-		req.Header.Set("Idempotency-Key", key)
+		headers["Idempotency-Key"] = key
 	}
 	if timeout > 0 {
-		req.Header.Set("timeout", strconv.Itoa(timeout))
+		headers["timeout"] = strconv.Itoa(timeout)
 	}
-	resp, e := c.HTTP.Do(req)
-	if e != nil {
-		return fmt.Errorf("UCE request failed: %T", e)
-	}
-	defer resp.Body.Close()
-	data, e := io.ReadAll(io.LimitReader(resp.Body, (8<<20)+1))
-	if e != nil {
-		return fmt.Errorf("UCE response read failed")
-	}
-	if len(data) > 8<<20 {
-		return fmt.Errorf("UCE response exceeds limit")
-	}
-	if resp.StatusCode >= 300 {
-		var x struct {
-			Code string `json:"code"`
-		}
-		_ = json.Unmarshal(data, &x)
-		if len(x.Code) > 100 {
-			x.Code = "remote_error"
-		}
-		return &HTTPError{resp.StatusCode, x.Code}
-	}
-	if out != nil {
-		if e = json.Unmarshal(data, out); e != nil {
-			return fmt.Errorf("invalid UCE response")
-		}
-	}
-	return nil
+	return c.Call(ctx, method, path, headers, body, out)
 }
 func (c *Client) Register(ctx context.Context, ep json.RawMessage) (string, error) {
 	var v struct {
@@ -149,7 +82,10 @@ func (c *Client) Observe(ctx context.Context, id string) (backend.Observation, e
 		return o, e
 	}
 	o.Raw = raw
-	e = c.call(ctx, "GET", "/v1/workflow-runs/"+url.PathEscape(id)+"/stages", "", 0, nil, &o.Stages)
+	e = c.call(ctx, "GET", "/v1/workflow-runs/"+url.PathEscape(id)+"/stages", "", 0, nil, &o.StageDetails)
+	if e == nil {
+		e = json.Unmarshal(o.StageDetails, &o.Stages)
+	}
 	return o, e
 }
 func (c *Client) Cancel(ctx context.Context, id string) error {

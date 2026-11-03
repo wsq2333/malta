@@ -32,14 +32,20 @@ type SaveRecord struct {
 	ChangeNote   string          `json:"change_note"`
 	Body         json.RawMessage `json:"body"`
 }
+type Implementation struct {
+	Template json.RawMessage `json:"template,omitempty"`
+	Bindings []Binding       `json:"bindings"`
+	Results  []ResultRule    `json:"results"`
+}
 type Definition struct {
-	SchemaVersion string          `json:"schema_version"`
-	Backend       string          `json:"backend"`
-	Template      json.RawMessage `json:"template"`
-	Parameters    json.RawMessage `json:"parameters"`
-	Defaults      map[string]any  `json:"defaults"`
-	Bindings      []Binding       `json:"bindings"`
-	Results       []ResultRule    `json:"results"`
+	Implementations map[string]Implementation `json:"implementations,omitempty"`
+	SchemaVersion   string                    `json:"schema_version"`
+	Backend         string                    `json:"backend"`
+	Template        json.RawMessage           `json:"template,omitempty"`
+	Parameters      json.RawMessage           `json:"parameters,omitempty"`
+	Defaults        map[string]any            `json:"defaults"`
+	Bindings        []Binding                 `json:"bindings"`
+	Results         []ResultRule              `json:"results"`
 	// Dataset budget counts the unique prepared dataset, not each consuming stage.
 	Dataset        Dataset `json:"dataset"`
 	TimeoutSeconds int     `json:"timeout_seconds"`
@@ -86,7 +92,7 @@ type Selection struct {
 	System     Ref            `json:"system"`
 	Profile    Ref            `json:"profile"`
 	VersionID  string         `json:"version_id"`
-	Parameters map[string]any `json:"parameters"`
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 type Snapshot struct {
 	Selection      Selection              `json:"selection"`

@@ -26,6 +26,7 @@ func TestWorkflowCLIAndConfig(t *testing.T) {
 		args []string
 		path string
 	}{
+		{[]string{"list", "--backend", "argo", "--connection", "dev"}, "/api/v1/workflow/runs?limit=20&offset=0&backend=argo&connection=dev"},
 		{[]string{"list", "--limit", "5", "--offset", "10"}, "/api/v1/workflow/runs?limit=5&offset=10"},
 		{[]string{"records", "cases", "--id", "test-case"}, "/api/v1/workflow/records/cases?id=test-case"},
 		{[]string{"issues", "test-run"}, "/api/v1/workflow/runs/test-run/issues"},

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/wsq2333/malta/internal/backend"
-	"github.com/wsq2333/malta/internal/backend/uce"
+
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/engine/fio"
 	"io"
@@ -97,7 +97,7 @@ func (m *Manager) Artifact(id, path string) ([]byte, error) {
 	}
 	return readEvidence(filepath.Join(m.Store.Dir, "workflow-artifacts", id), path, 32<<20)
 }
-func (m *Manager) collect(r *Run, o backend.Observation, b backend.Backend, cfg uce.Config) ([]Result, bool, bool, bool) {
+func (m *Manager) collect(r *Run, o backend.Observation, b backend.Backend, cfg backend.Config) ([]Result, bool, bool, bool) {
 	results := []Result{}
 	complete, invalid, passed := true, false, true
 	used := int64(0)
@@ -114,7 +114,17 @@ func (m *Manager) collect(r *Run, o backend.Observation, b backend.Backend, cfg 
 		rr.StageID = stage.ID
 		rr.Attempt = stage.Attempt
 		var e error
-		if !found || !terminal(strings.ToLower(stage.Status)) && strings.ToLower(stage.Status) != "timeout" {
+		ambiguous := false
+		for _, candidate := range o.Stages {
+			if candidate.NodeID == rule.NodeID && candidate.Attempt == stage.Attempt && candidate.ID != stage.ID {
+				ambiguous = true
+			}
+		}
+		if ambiguous {
+			e = domain.E("invalid", "ambiguous stage identity for result rule")
+		} else if o.EvidenceError != "" {
+			e = fmt.Errorf("%s", o.EvidenceError)
+		} else if !found || !terminal(strings.ToLower(stage.Status)) && strings.ToLower(stage.Status) != "timeout" {
 			e = fmt.Errorf("required stage has no terminal current attempt")
 		} else {
 			var outputs []backend.Output
@@ -131,7 +141,7 @@ func (m *Manager) collect(r *Run, o backend.Observation, b backend.Backend, cfg 
 					}
 					matched = true
 					if out.RunID != r.ExternalRunID || out.StageID != stage.ID || out.Attempt != stage.Attempt {
-						e = domain.E("invalid", "UCE output identity mismatch")
+						e = domain.E("invalid", "backend output identity mismatch")
 						break
 					}
 					rr, e = m.verify(r, rule, stage, out.Path, cfg, &used)
@@ -161,13 +171,13 @@ func (m *Manager) collect(r *Run, o backend.Observation, b backend.Backend, cfg 
 	}
 	return results, complete, invalid, passed
 }
-func (m *Manager) verify(r *Run, rule ResultRule, stage backend.Stage, remotePath string, cfg uce.Config, used *int64) (Result, error) {
+func (m *Manager) verify(r *Run, rule ResultRule, stage backend.Stage, remotePath string, cfg backend.Config, used *int64) (Result, error) {
 	result := Result{NodeID: rule.NodeID, StageID: stage.ID, Attempt: stage.Attempt, Parser: rule.Parser, State: "missing", Verdict: "inconclusive", Metrics: []domain.Metric{}, Files: []EvidenceFile{}}
 	rel, e := filepath.Rel(cfg.RemoteResultsRoot, remotePath)
 	if e != nil || !filepath.IsAbs(remotePath) || !fs.ValidPath(filepath.ToSlash(rel)) {
 		return result, domain.E("invalid", "output outside approved results root")
 	}
-	// The UCE contract restricts output paths; also require this exact run identity.
+	// Both backend contracts require paths scoped to the immutable external run identity.
 	if !strings.Contains("/"+filepath.ToSlash(rel)+"/", "/"+r.ExternalRunID+"/") {
 		return result, domain.E("invalid", "output path belongs to another run")
 	}

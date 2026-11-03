@@ -2397,3 +2397,15 @@ td strong {
     flex-direction: column;
   }
 }
+
+.agent-prompt-editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 420px;
+  margin-top: 16px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  line-height: 1.65;
+  tab-size: 2;
+}

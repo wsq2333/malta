@@ -657,7 +657,7 @@ export function App() {
                 <span className="live-tag">
                   <i />
                   {workflowPage
-                    ? "UCE 工作流"
+                    ? "原生工作流"
                     : page === "guide"
                       ? "入门与示例"
                       : "真实实验数据"}

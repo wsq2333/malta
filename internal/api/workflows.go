@@ -71,7 +71,7 @@ func workflowRoutes(mux *http.ServeMux, m *workflow.Manager) {
 			send(w, 400, nil, domain.E("invalid", "invalid pagination"))
 			return
 		}
-		v, e := m.Runs(limit, offset)
+		v, e := m.FilteredRuns(limit, offset, r.URL.Query().Get("backend"), r.URL.Query().Get("connection"))
 		send(w, 200, v, e)
 	})
 	mux.HandleFunc("GET /api/v1/workflow/requests/{id}", func(w http.ResponseWriter, r *http.Request) { v, e := m.Lookup(r.PathValue("id")); send(w, 200, v, e) })
