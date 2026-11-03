@@ -1,15 +1,17 @@
-# Copy to workflow.yaml (ignored by Git). Set real values only in that copy.
-# This is an allowlist of UCE routes controlled by the Malta administrator.
+# Copy to workflow.yaml (ignored by Git). Enable only after verifying access and storage.
 connections:
-  - id: sample-dev-uce
-    url: https://uce.example.invalid
-    token_file: /var/run/secrets/malta-uce/token
-    cluster: sample-dev
-    namespace: malta-workflows
-    subtypes: [malta]
-    # Same NAS directory visible to UCE stage Pods and the Malta Server.
-    remote_results_root: /mnt/uce/uce-runtime
-    local_results_root: /results/uce-runtime
-    max_bytes: 274877906944 # 256 GiB of unique dataset content
+  - id: example-argo
+    backend: argo
+    enabled: false
+    url: https://argo.example.invalid
+    auth:
+      type: bearer_token_file
+      token_file: /var/run/secrets/malta-argo/token
+    cluster: replace-execution-cluster
+    namespace: replace-execution-namespace
+    max_bytes: 274877906944
     timeout_seconds: 3600
-    artifact_bytes: 33554432 # manifests + raw reports, not the benchmark dataset
+    artifact_bytes: 33554432
+    # Required only for result parsing; both paths must expose the same shared directory.
+    remote_results_root: /results
+    local_results_root: /results

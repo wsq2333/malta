@@ -2,7 +2,7 @@ package backend
 
 import "github.com/wsq2333/malta/internal/backend/auth"
 
-// Existing fields retain their serialization order for persisted UCE connection hashes.
+// Config describes a supported workflow endpoint. Backend must be explicit.
 type Config struct {
 	ID                string       `json:"id"`
 	URL               string       `json:"url"`
@@ -14,16 +14,12 @@ type Config struct {
 	ArtifactBytes     int64        `json:"artifact_bytes"`
 	Cluster           string       `json:"cluster"`
 	Namespace         string       `json:"namespace"`
-	Subtypes          []string     `json:"subtypes"`
 	Backend           string       `json:"backend,omitempty"`
 	Enabled           *bool        `json:"enabled,omitempty"`
 	Auth              *auth.Config `json:"auth,omitempty"`
 }
 
 func (c Config) Kind() string {
-	if c.Backend == "" {
-		return "uce"
-	}
 	return c.Backend
 }
 func (c Config) Active() bool { return c.Enabled == nil || *c.Enabled }

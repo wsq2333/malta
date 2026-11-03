@@ -1,4 +1,0 @@
-#!/bin/sh
-export PYTHONPATH=/opt/marea-test-tools/deps
-export PYTHONDONTWRITEBYTECODE=1
-exec /usr/bin/python3 /opt/marea-test-tools/tasks.py "$@"

@@ -1,6 +1,6 @@
 {
   "name": "Argo JUnit 证据回收示例",
-  "description": "完整原生模板；不配置结果解析",
+  "description": "原生 Argo DAG；可选 JUnit 结果解析和共享卷证据校验",
   "body": {
     "schema_version": "workflow/v1alpha1",
     "backend": "argo",

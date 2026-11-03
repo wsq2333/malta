@@ -79,16 +79,10 @@ kubeconfig.yml
 /docs/examples/workflow/**
 !/docs/examples/workflow/argo-evidence.example.json
 !/docs/examples/workflow/case.example.json
-!/docs/examples/workflow/multi-backend.example.json
 !/docs/examples/workflow/native-argo.example.json
-!/docs/examples/workflow/native-uce.example.json
 !/docs/examples/workflow/profile.example.json
 !/docs/examples/workflow/selection.example.json
 !/docs/examples/workflow/system.example.json
-!/docs/examples/workflow/oss-fuse-fio.ep.example.json
-!/docs/examples/workflow/oss-fuse-fio.case.example.json
-!/docs/examples/workflow/oss-fuse-fio.parameters.example.json
-!/docs/examples/workflow/oss-fuse-fio.parameters-256gib.example.json
 
 # Keep only portable deployment examples in overlays; real overlays belong in config/deploy.
 /deploy/kubernetes/overlays/**
@@ -99,8 +93,3 @@ kubeconfig.yml
 !/deploy/kubernetes/overlays/workflow/
 !/deploy/kubernetes/overlays/workflow/README.md
 !/deploy/kubernetes/overlays/workflow/endpoints.example.yaml
-
-# Generated tool manifests/configuration must not sit beside versioned source files.
-/tools/marea-test-tools/**/*.json
-/tools/marea-test-tools/**/*.yaml
-/tools/marea-test-tools/**/*.yml

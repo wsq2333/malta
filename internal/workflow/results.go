@@ -199,7 +199,7 @@ func (m *Manager) verify(r *Run, rule ResultRule, stage backend.Stage, remotePat
 	if e = domain.DecodeJSON(strings.NewReader(string(raw)), &manifest); e != nil {
 		return result, domain.E("invalid", "invalid evidence manifest")
 	}
-	if manifest.SchemaVersion != "malta.evidence/v1" || manifest.UCERunID != r.ExternalRunID || manifest.UCEVersionID != r.ExternalVersionID || manifest.NodeID != rule.NodeID || manifest.StageID != stage.ID || manifest.Attempt != stage.Attempt || manifest.EvictionCount != stage.EvictionCount || manifest.SnapshotHash != r.Snapshot.Hash || manifest.EnvironmentID != r.Snapshot.Environment.ID || manifest.SoftwareVersionID != r.Snapshot.Version.ID || manifest.Parser != rule.Parser {
+	if manifest.SchemaVersion != "malta.evidence/v1" || manifest.ExternalRunID != r.ExternalRunID || manifest.ExternalVersionID != r.ExternalVersionID || manifest.NodeID != rule.NodeID || manifest.StageID != stage.ID || manifest.Attempt != stage.Attempt || manifest.EvictionCount != stage.EvictionCount || manifest.SnapshotHash != r.Snapshot.Hash || manifest.EnvironmentID != r.Snapshot.Environment.ID || manifest.SoftwareVersionID != r.Snapshot.Version.ID || manifest.Parser != rule.Parser {
 		return result, domain.E("invalid", "evidence identity/contract mismatch")
 	}
 	if len(manifest.Files) > 64 {

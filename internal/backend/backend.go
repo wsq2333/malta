@@ -1,4 +1,4 @@
-// Package backend is the framework boundary. UCE and Argo implement the same lifecycle and evidence interface.
+// Package backend is the framework boundary. Argo implements the lifecycle and evidence interface; future adapters can reuse it.
 package backend
 
 import (
@@ -36,8 +36,6 @@ type Submission struct {
 	Key            string
 	Name           string
 	Inputs         map[string]any
-	Queue          string
-	Subtype        string
 	TimeoutSeconds int
 }
 type Backend interface {

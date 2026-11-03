@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | `deploy/kubeconfig.example.yaml` | 部署与测试集群的地址、CA、用户和 context | kubectl 标准 kubeconfig |
 | `parameter/executor.example.yaml` | 测试节点、PVC、Runner 镜像与资源预算 | `serve --kubernetes-config` 可加载 YAML 或 JSON |
-| `parameter/workflow-backends.example.yaml` | 多后端连接、自动获取/刷新 Token，凭据引用 Secret 文件 | 新版 `serve --workflow-config` 可加载，默认未启用 |
-| `parameter/workflow.example.yaml` | UCE 连接、路由范围、结果卷映射与预算；Token 只引用文件 | `serve --workflow-config` 可加载 YAML 或 JSON |
+| `parameter/workflow-backends.example.yaml` | Argo 连接、通用认证与 Token 刷新，凭据引用 Secret 文件 | 新版 `serve --workflow-config` 可加载，默认未启用 |
+| `parameter/workflow.example.yaml` | Argo 连接、路由范围、结果卷映射与预算；Token 只引用文件 | `serve --workflow-config` 可加载 YAML 或 JSON |
 | `parameter/application.example.yaml` | 服务与本地 Runner 参数 | 预留模板，当前需手动传 CLI flag |
 | `llm/providers.example.yaml` | 供应商、模型、API 地址与密钥来源 | 预留模板，当前未接入 LLM 加载器 |
 
@@ -55,25 +55,23 @@ git status --short --untracked-files=all -- config
 
 第一条应列出全部四个真实配置路径；第二条只能出现指定示例与说明的修改。新增可提交示例时，需要同步更新根目录 `.gitignore` 的白名单并检查内容。
 
-## UCE 工作流执行
+## Argo 工作流执行
 
-复制 `parameter/workflow.example.yaml` 为 `parameter/workflow.yaml`，配置经管理员验收的路由和共享结果卷；真实 Token 放在受限文件或 Kubernetes Secret 中。启动参数为 `serve --workflow-config config/parameter/workflow.yaml`。不要同时使用 `--management-only`。详细部署前提、用例和结果协议见[工作流测试](../docs/workflows.md)。此改动不自动部署 UCE 或创建 PVC。
+复制 `parameter/workflow.example.yaml` 为 `parameter/workflow.yaml`，配置经管理员验收的路由和共享结果卷；真实 Token 放在受限文件或 Kubernetes Secret 中。启动参数为 `serve --workflow-config config/parameter/workflow.yaml`。不要同时使用 `--management-only`。详细部署前提、用例和结果协议见[工作流测试](../docs/workflows.md)。此改动不自动部署 Argo 或创建 PVC。
 
 
 ## 工作流模板与认证信息的边界
 
-仓库只保存经过审阅、使用占位值的工作流示例。`docs/examples/workflow/` 和部署 overlay 目录采用明确的文件白名单；即使新文件名字含 `example`，也不会自动获准提交。真实 EP / Argo 模板、用例、参数、环境地址、渲染输出和运行快照统一保存在 `config/workflow/`，账号、密码、Token、OSS AK/SK 和待应用的 Secret 清单保存在 `config/secrets/`。这两个目录及其任意层级内容均被忽略。
+仓库只保存经过审阅、使用占位值的工作流示例。`docs/examples/workflow/` 和部署 overlay 目录采用明确的文件白名单；即使新文件名字含 `example`，也不会自动获准提交。真实 Argo 模板、用例、参数、环境地址、渲染输出和运行快照统一保存在 `config/workflow/`，账号、密码、Token、OSS AK/SK 和待应用的 Secret 清单保存在 `config/secrets/`。这两个目录及其任意层级内容均被忽略。
 
 ```sh
 mkdir -p config/workflow config/secrets
 chmod 700 config/workflow config/secrets
-cp -n docs/examples/workflow/oss-fuse-fio.ep.example.json config/workflow/oss-fuse-fio.ep.json
-cp -n docs/examples/workflow/oss-fuse-fio.case.example.json config/workflow/oss-fuse-fio.case.json
-cp -n docs/examples/workflow/oss-fuse-fio.parameters.example.json config/workflow/oss-fuse-fio.parameters.json
-chmod 600 config/workflow/oss-fuse-fio.*.json
-git check-ignore config/workflow/oss-fuse-fio.ep.json config/secrets/uce-auth.yaml
+cp -n docs/examples/workflow/native-argo.example.json config/workflow/native-argo.case.json
+chmod 600 config/workflow/native-argo.case.json
+git check-ignore config/workflow/native-argo.case.json config/secrets/argo-auth.yaml
 ```
 
-只修改本地副本，再通过 Malta 页面或 CLI 使用。示例中的 Secret 名称/键引用可以提交，真实值和 base64 编码的 Secret `data` 不能提交；base64 不是脱敏。根目录规则还忽略 `.env`、常见密钥文件、Secret 文件及环境绑定的 `*.ep.json`、`*.parameters.json`、`*.template.yaml` 等。
+只修改本地副本，再通过 Malta 页面或 CLI 使用。示例中的 Secret 名称/键引用可以提交，真实值和 base64 编码的 Secret `data` 不能提交；base64 不是脱敏。根目录规则还忽略 `.env`、常见密钥文件、Secret 文件及环境绑定的 `*.parameters.json`、`*.template.yaml` 等。
 
 `.gitignore` 不检查文件内容，也不会移除已跟踪的文件。不要把真实值写进白名单示例、源码、文档或测试；提交前检查暂存差异。若真实凭据已进入 Git 历史，需另行移除历史内容并轮换凭据，单改忽略规则无法撤回。
