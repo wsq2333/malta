@@ -23,7 +23,10 @@ func fixture(t *testing.T) (*Manager, Selection, uce.Config) {
 	t.Cleanup(func() { s.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	cfg := uce.Config{ID: "test", URL: "http://example.invalid", TokenFile: "unused", RemoteResultsRoot: "/shared", LocalResultsRoot: t.TempDir(), MaxBytes: 1 << 30, TimeoutSeconds: 120, ArtifactBytes: 1 << 20, Cluster: "sample", Namespace: "bench", Subtypes: []string{"malta"}}
+	cfg := uce.Config{ID: "test", URL: "http://example.invalid", TokenFile: filepath.Join(t.TempDir(), "token"), RemoteResultsRoot: "/shared", LocalResultsRoot: t.TempDir(), MaxBytes: 1 << 30, TimeoutSeconds: 120, ArtifactBytes: 1 << 20, Cluster: "sample", Namespace: "bench", Subtypes: []string{"malta"}}
+	if e = os.WriteFile(cfg.TokenFile, []byte("test-token"), 0600); e != nil {
+		t.Fatal(e)
+	}
 	m := &Manager{Store: s, enabled: true, ctx: ctx, connections: map[string]uce.Config{"test": cfg}, backends: map[string]backend.Backend{"test": &fakeBackend{}}}
 	if e = migrate(s); e != nil {
 		t.Fatal(e)
@@ -340,5 +343,16 @@ func TestFioEvidenceAndFailedStageReport(t *testing.T) {
 	rule.ExpectedOptions["bs"] = "4m"
 	if _, e = m.verify(&r, rule, stage, f.outputs[0].Path, cfg, new(int64)); e == nil {
 		t.Fatal("accepted wrong fio block size")
+	}
+}
+
+func TestMissingCredentialBlocksPreflight(t *testing.T) {
+	m, q, cfg := fixture(t)
+	if e := os.Remove(cfg.TokenFile); e != nil {
+		t.Fatal(e)
+	}
+	p, e := m.Preflight(q)
+	if e != nil || p.Ready {
+		t.Fatal("missing credentials permitted", p, e)
 	}
 }

@@ -84,6 +84,12 @@ func (m *Manager) Preflight(q Selection) (Preflight, error) {
 	var profile Profile
 	_ = json.Unmarshal(s.Profile.Body, &profile)
 	cfg := m.connections[profile.Connection]
+	if token, e := os.ReadFile(cfg.TokenFile); e != nil || strings.TrimSpace(string(token)) == "" {
+		p.Ready = false
+		p.Checks = append(p.Checks, Check{"UCE 凭据", "failed", "服务端 Token 文件不可读取或为空"})
+	} else {
+		p.Checks = append(p.Checks, Check{"UCE 凭据", "passed", "Token 文件可读取；实际权限由 UCE 注册与提交接口验证"})
+	}
 	if st, statErr := os.Stat(cfg.LocalResultsRoot); statErr != nil || !st.IsDir() {
 		p.Ready = false
 		p.Checks = append(p.Checks, Check{"结果卷", "failed", "服务端结果根目录不可访问"})
