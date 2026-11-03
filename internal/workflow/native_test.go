@@ -27,7 +27,7 @@ func TestNativeTemplatesWithoutResultContract(t *testing.T) {
 	var ep map[string]any
 	json.Unmarshal(d.Template, &ep)
 	ep["custom_backend_field"] = map[string]any{"native": true}
-	rootDAG(ep)["inputs"] = []any{}
+	object(ep["spec"])["arguments"] = map[string]any{}
 	d.Template, _ = json.Marshal(ep)
 	record.Body, _ = json.Marshal(d)
 	saved, e := m.Save("cases", SaveRecord{ID: record.ID, BaseRevision: 1, Name: record.Name, Body: record.Body})
@@ -55,13 +55,10 @@ func TestNativeTemplatesWithoutResultContract(t *testing.T) {
 		t.Fatal("native success misreported as test pass", r)
 	}
 }
-func TestMultiBackendSelectionAndServerFiltering(t *testing.T) {
+func TestArgoImplementationSelectionAndServerFiltering(t *testing.T) {
 	m, q, cfg := fixture(t)
-	record, _ := m.Record("cases", q.Case)
-	var original Definition
-	json.Unmarshal(record.Body, &original)
 	argo := json.RawMessage(`{"apiVersion":"argoproj.io/v1alpha1","kind":"WorkflowTemplate","spec":{"entrypoint":"native-steps","retryStrategy":{"limit":2},"templates":[{"name":"native-steps","steps":[[{"name":"hello","template":"hello"}]]},{"name":"hello","container":{"image":"alpine","command":["echo","hello"]}}]}}`)
-	d := Definition{SchemaVersion: Schema, TimeoutSeconds: 60, Implementations: map[string]Implementation{"uce": {Template: original.Template}, "argo": {Template: argo}}}
+	d := Definition{SchemaVersion: Schema, TimeoutSeconds: 60, Implementations: map[string]Implementation{"argo": {Template: argo}}}
 	body, _ := json.Marshal(d)
 	saved, e := m.Save("cases", SaveRecord{Name: "native variants", Body: body})
 	if e != nil {
@@ -94,7 +91,7 @@ func TestMultiBackendSelectionAndServerFiltering(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	filtered, e := m.FilteredRuns(20, 0, "uce", "")
+	filtered, e := m.FilteredRuns(20, 0, "argo", "another-connection")
 	if e != nil || len(filtered) != 0 {
 		t.Fatal(filtered, e)
 	}
@@ -102,35 +99,15 @@ func TestMultiBackendSelectionAndServerFiltering(t *testing.T) {
 	if e != nil || len(filtered) != 1 || filtered[0].ID != r.ID {
 		t.Fatal(filtered, e)
 	}
-	cfg.Backend = "uce"
+	cfg.Backend = "unsupported"
 	m.connections[cfg.ID] = cfg
 	if _, e = m.compile(q); e == nil {
 		t.Fatal("accepted backend mismatch")
 	}
 }
-func TestDisabledConnectionsAndLegacyHashes(t *testing.T) {
+func TestDisabledConnections(t *testing.T) {
 	m, _, cfg := fixture(t)
 	_ = m
-	legacy := struct {
-		ID                string   `json:"id"`
-		URL               string   `json:"url"`
-		TokenFile         string   `json:"token_file"`
-		RemoteResultsRoot string   `json:"remote_results_root"`
-		LocalResultsRoot  string   `json:"local_results_root"`
-		MaxBytes          int64    `json:"max_bytes"`
-		TimeoutSeconds    int      `json:"timeout_seconds"`
-		ArtifactBytes     int64    `json:"artifact_bytes"`
-		Cluster           string   `json:"cluster"`
-		Namespace         string   `json:"namespace"`
-		Subtypes          []string `json:"subtypes"`
-	}{cfg.ID, cfg.URL, "", cfg.RemoteResultsRoot, cfg.LocalResultsRoot, cfg.MaxBytes, cfg.TimeoutSeconds, cfg.ArtifactBytes, cfg.Cluster, cfg.Namespace, cfg.Subtypes}
-	raw, _ := json.Marshal(legacy)
-	copy := cfg
-	copy.TokenFile = ""
-	current, _ := json.Marshal(copy)
-	if string(raw) != string(current) {
-		t.Fatal("legacy connection serialization changed")
-	}
 	disabled := false
 	cfg.Enabled = &disabled
 	cfg.Cluster = ""
@@ -185,7 +162,7 @@ func TestArgoNativeLifecycleThroughREST(t *testing.T) {
 	cfg.URL = server.URL
 	cfg.Backend = "argo"
 	m.connections["test"] = cfg
-	// Backend-specific integration follows the same manager lifecycle used by UCE.
+	// Exercise the Argo adapter through the shared manager lifecycle.
 	client, e := argo.New(cfg)
 	if e != nil {
 		t.Fatal(e)
@@ -264,7 +241,7 @@ func TestArgoEvidenceIsVerifiedAfterNativeExecution(t *testing.T) {
 			}
 			raw := []byte(`<testsuite tests="1"><testcase classname="argo" name="real-report"/></testsuite>`)
 			os.WriteFile(filepath.Join(dir, "junit.xml"), raw, 0600)
-			manifest := Evidence{SchemaVersion: "malta.evidence/v1", UCEVersionID: ctx["workflow_version_id"], UCERunID: id, NodeID: "check", StageID: stage, SnapshotHash: ctx["snapshot_hash"], EnvironmentID: ctx["environment_id"], SoftwareVersionID: ctx["software_version_id"], Parser: "junit", Assertions: map[string]bool{}, Files: []EvidenceFile{{Path: "junit.xml", SHA256: domain.BytesHash(raw), Size: int64(len(raw))}}}
+			manifest := Evidence{SchemaVersion: "malta.evidence/v1", ExternalVersionID: ctx["workflow_version_id"], ExternalRunID: id, NodeID: "check", StageID: stage, SnapshotHash: ctx["snapshot_hash"], EnvironmentID: ctx["environment_id"], SoftwareVersionID: ctx["software_version_id"], Parser: "junit", Assertions: map[string]bool{}, Files: []EvidenceFile{{Path: "junit.xml", SHA256: domain.BytesHash(raw), Size: int64(len(raw))}}}
 			data, _ := json.Marshal(manifest)
 			os.WriteFile(filepath.Join(dir, "manifest.json"), data, 0600)
 			run["status"] = map[string]any{"phase": "Succeeded", "nodes": map[string]any{stage: map[string]any{"id": stage, "name": name + ".check", "displayName": "check", "type": "Pod", "phase": "Succeeded", "outputs": map[string]any{"parameters": []any{map[string]any{"name": "evidence", "value": "/shared/" + id + "/" + stage + "/manifest.json"}}, "artifacts": []any{map[string]any{"name": "native-artifact-reference"}}}}}}
@@ -321,7 +298,7 @@ func TestArgoEvidenceIsVerifiedAfterNativeExecution(t *testing.T) {
 	// Native workflow with no parser cannot be used as a verification result (existing issue rule).
 }
 func TestNativeExamplesAndConfiguration(t *testing.T) {
-	for _, name := range []string{"native-uce.example.json", "native-argo.example.json", "multi-backend.example.json", "argo-evidence.example.json"} {
+	for _, name := range []string{"native-argo.example.json", "argo-evidence.example.json"} {
 		var q SaveRecord
 		if e := domain.Read("../../docs/examples/workflow/"+name, &q); e != nil {
 			t.Fatal(name, e)
@@ -346,7 +323,74 @@ func TestNativeExamplesAndConfiguration(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer manager.Close()
-	if manager.Enabled() || len(manager.Connections()) != 2 {
+	if manager.Enabled() || len(manager.Connections()) != 1 {
 		t.Fatal("disabled sample unexpectedly active")
+	}
+}
+
+func TestUnsupportedBackendsCannotExecute(t *testing.T) {
+	m, q, cfg := fixture(t)
+	record, _ := m.Record("cases", q.Case)
+	var d Definition
+	if e := json.Unmarshal(record.Body, &d); e != nil {
+		t.Fatal(e)
+	}
+	for _, kind := range []string{"", "private-engine", "ARGO"} {
+		t.Run("backend-"+kind, func(t *testing.T) {
+			bad := d
+			bad.Backend = kind
+			raw, _ := json.Marshal(bad)
+			if _, e := m.Save("cases", SaveRecord{Name: "unsupported", Body: raw}); e == nil {
+				t.Fatal("accepted unsupported case")
+			}
+			badConfig := cfg
+			badConfig.Backend = kind
+			disabled := false
+			badConfig.Enabled = &disabled
+			manager, e := New(m.Store, Config{Connections: []backend.Config{badConfig}}, true)
+			if e == nil {
+				manager.Close()
+				t.Fatal("accepted unsupported connection even when disabled")
+			}
+			profile := Profile{Backend: kind, Connection: cfg.ID, Cluster: cfg.Cluster, Namespace: cfg.Namespace, SystemIDs: []string{q.System.ID}}
+			raw, _ = json.Marshal(profile)
+			if _, e := m.Save("profiles", SaveRecord{Name: "unsupported", Body: raw}); e == nil {
+				t.Fatal("accepted unsupported profile")
+			}
+		})
+	}
+	mixed := Definition{SchemaVersion: Schema, Implementations: map[string]Implementation{"argo": {Template: d.Template}, "private-engine": {Template: d.Template}}}
+	raw, _ := json.Marshal(mixed)
+	if _, e := m.Save("cases", SaveRecord{Name: "mixed unsupported", Body: raw}); e == nil {
+		t.Fatal("accepted hidden unsupported implementation")
+	}
+	if _, e := m.FilteredRuns(20, 0, "private-engine", ""); e == nil {
+		t.Fatal("accepted unsupported filter")
+	}
+	// A bare object must not be mistaken for a native Argo definition.
+	d.Template = json.RawMessage(`{"spec":{}}`)
+	if e := validateDefinition(d); e == nil {
+		t.Fatal("accepted non-Argo template")
+	}
+}
+
+func TestUnsupportedHistoricalRunIsNotResumed(t *testing.T) {
+	m, q, _ := fixture(t)
+	pre, e := m.Preflight(q)
+	if e != nil {
+		t.Fatal(e)
+	}
+	r, e := m.Start(Start{pre.ID, pre.Snapshot.Hash, "historical"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	var profile Profile
+	json.Unmarshal(r.Snapshot.Profile.Body, &profile)
+	profile.Backend = "private-engine"
+	r.Snapshot.Profile.Body, _ = json.Marshal(profile)
+	m.advance(&r)
+	fake := m.backends["test"].(*fakeBackend)
+	if r.Error == "" || fake.registers != 0 || fake.submits != 0 || fake.lookups != 0 {
+		t.Fatal("resumed unsupported historical run", r)
 	}
 }

@@ -1,4 +1,3 @@
-# Runtime configuration for serve --workflow-config /etc/malta-workflows/workflow.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,30 +7,9 @@ metadata:
     app.kubernetes.io/part-of: malta
 data:
   workflow.yaml: |
-    # All entries are disabled until the operator supplies Secrets and verifies routes.
-    # Legacy UCE token_file-only connections remain supported.
+    # Copy to workflow.yaml (ignored by Git). Enable only after verifying access and storage.
     connections:
-      - id: sample-dev-uce
-        backend: uce
-        enabled: false
-        url: https://uce.example.invalid
-        auth:
-          type: oauth2_password
-          token_url: https://keycloak.example.invalid/realms/master/protocol/openid-connect/token
-          client_id: uce-user-api
-          username_file: /var/run/secrets/malta-uce/username
-          password_file: /var/run/secrets/malta-uce/password
-          # client_secret_file: /var/run/secrets/malta-uce/client-secret
-        cluster: replace-execution-cluster
-        namespace: replace-execution-namespace
-        subtypes: [malta]
-        max_bytes: 274877906944
-        timeout_seconds: 3600
-        artifact_bytes: 33554432
-        # Only needed when a case opts in to results parsing; these must be the SAME NAS directory.
-        remote_results_root: /mnt/uce/uce-runtime
-        local_results_root: /results/uce-runtime
-      - id: sample-dev-argo
+      - id: example-argo
         backend: argo
         enabled: false
         url: https://argo.example.invalid
@@ -43,5 +21,6 @@ data:
         max_bytes: 274877906944
         timeout_seconds: 3600
         artifact_bytes: 33554432
+        # Required only for result parsing; both paths must expose the same shared directory.
         remote_results_root: /results
         local_results_root: /results

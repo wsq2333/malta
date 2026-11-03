@@ -83,8 +83,6 @@ type Profile struct {
 	Cluster    string         `json:"cluster"`
 	Namespace  string         `json:"namespace"`
 	Node       string         `json:"node"`
-	Queue      string         `json:"queue"`
-	Subtype    string         `json:"subtype"`
 	Settings   map[string]any `json:"settings"`
 }
 type Selection struct {
@@ -160,8 +158,8 @@ type Evidence struct {
 	EvictionCount     int             `json:"eviction_count"`
 	SnapshotHash      string          `json:"snapshot_hash"`
 	SchemaVersion     string          `json:"schema_version"`
-	UCEVersionID      string          `json:"workflow_version_id"`
-	UCERunID          string          `json:"run_id"`
+	ExternalVersionID string          `json:"workflow_version_id"`
+	ExternalRunID     string          `json:"run_id"`
 	NodeID            string          `json:"node_id"`
 	StageID           string          `json:"stage_run_id"`
 	Attempt           int             `json:"attempt"`

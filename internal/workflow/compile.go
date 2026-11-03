@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	js "github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/wsq2333/malta/internal/domain"
 	"math"
@@ -72,8 +71,8 @@ func validateDefinition(d Definition) error {
 		}
 		return nil
 	}
-	if d.SchemaVersion != Schema || !slices.Contains([]string{"uce", "argo"}, d.Backend) {
-		return domain.E("unsupported", "require workflow/v1alpha1 and uce or argo")
+	if d.SchemaVersion != Schema || d.Backend != "argo" {
+		return domain.E("unsupported", "require workflow/v1alpha1 and explicit backend argo")
 	}
 	if d.TimeoutSeconds < 0 || d.TimeoutSeconds > 86400 || len(d.Results) > 64 {
 		return domain.E("invalid", "timeout must be 0..86400; maximum 64 result rules")
@@ -119,7 +118,7 @@ func validateDefinition(d Definition) error {
 		if b.Source != "system" && b.Source != "profile" {
 			return domain.E("invalid", "binding source must be system or profile")
 		}
-		if (d.Backend == "uce" && (!strings.HasPrefix(b.Pointer, "/operator_definitions/") || !strings.Contains(b.Pointer, "/manifest/spec/"))) || (d.Backend == "argo" && !strings.HasPrefix(b.Pointer, "/spec/")) {
+		if !strings.HasPrefix(b.Pointer, "/spec/") {
 			return domain.E("invalid", "bindings must target native workload spec fields")
 		}
 	}
@@ -137,38 +136,16 @@ func nativeTemplate(d Definition) (map[string]any, error) {
 		if root["status"] != nil {
 			return nil, domain.E("invalid", "provide an Argo definition without runtime status")
 		}
-	} else {
-		id, _ := root["root_dag_version_id"].(string)
-		if id == "" {
-			return nil, domain.E("invalid", "UCE EP requires root_dag_version_id")
-		}
-		if rootDAG(root) == nil {
-			return nil, domain.E("invalid", "UCE root DAG definition is missing")
-		}
 	}
 	return root, nil
 }
-func rootDAG(root map[string]any) map[string]any {
-	for _, v := range array(root["dag_definitions"]) {
-		d := object(v)
-		if d["dag_version_id"] == root["root_dag_version_id"] {
-			return d
-		}
-	}
-	return nil
-}
 func declaresContext(root map[string]any, kind string) bool {
-	if kind == "argo" {
-		for _, v := range array(object(object(root["spec"])["arguments"])["parameters"]) {
-			if object(v)["name"] == "malta_context" {
-				return true
-			}
-		}
-	} else {
-		for _, v := range array(rootDAG(root)["inputs"]) {
-			if object(v)["name"] == "malta_context" && object(v)["type"] == "json" {
-				return true
-			}
+	if kind != "argo" {
+		return false
+	}
+	for _, v := range array(object(object(root["spec"])["arguments"])["parameters"]) {
+		if object(v)["name"] == "malta_context" {
+			return true
 		}
 	}
 	return false
@@ -256,7 +233,7 @@ func (m *Manager) compile(q Selection) (Snapshot, error) {
 	if !ok {
 		return s, domain.E("invalid", "workflow connection is not configured")
 	}
-	if !cfg.Active() || cfg.Kind() != p.Backend || cfg.Cluster != p.Cluster || cfg.Namespace != p.Namespace || (p.Backend == "uce" && !slices.Contains(cfg.Subtypes, p.Subtype)) {
+	if !cfg.Active() || cfg.Kind() != p.Backend || cfg.Cluster != p.Cluster || cfg.Namespace != p.Namespace {
 		return s, domain.E("invalid", "profile differs from enabled backend/route scope")
 	}
 	if len(s.Definition.Results) > 0 && (cfg.RemoteResultsRoot == "" || cfg.LocalResultsRoot == "") {
@@ -318,15 +295,6 @@ func (m *Manager) compile(q Selection) (Snapshot, error) {
 		if ns := object(root["metadata"])["namespace"]; ns != nil && ns != p.Namespace {
 			return s, domain.E("invalid", "Argo template namespace differs from execution configuration")
 		}
-	} else {
-		// Binding changes require a new immutable UCE root version; leave native DAG semantics untouched.
-		dag := rootDAG(root)
-		if dag == nil {
-			return s, domain.E("invalid", "bound EP root missing")
-		}
-		id := uuid.NewSHA1(uuid.NameSpaceURL, []byte("malta-ep:"+domain.Hash(ep))).String()
-		root["root_dag_version_id"] = id
-		dag["dag_version_id"] = id
 	}
 	if len(s.Definition.Results) > 0 && !declaresContext(root, p.Backend) {
 		return s, domain.E("invalid", "result parsing requires a declared malta_context input")

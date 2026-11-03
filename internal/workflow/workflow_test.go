@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/wsq2333/malta/internal/backend"
-	"github.com/wsq2333/malta/internal/backend/uce"
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/store"
 	"os"
@@ -14,7 +13,7 @@ import (
 	"time"
 )
 
-func fixture(t *testing.T) (*Manager, Selection, uce.Config) {
+func fixture(t *testing.T) (*Manager, Selection, backend.Config) {
 	t.Helper()
 	s, e := store.Open(t.TempDir())
 	if e != nil {
@@ -23,11 +22,11 @@ func fixture(t *testing.T) (*Manager, Selection, uce.Config) {
 	t.Cleanup(func() { s.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	cfg := uce.Config{ID: "test", URL: "http://example.invalid", TokenFile: filepath.Join(t.TempDir(), "token"), RemoteResultsRoot: "/shared", LocalResultsRoot: t.TempDir(), MaxBytes: 1 << 30, TimeoutSeconds: 120, ArtifactBytes: 1 << 20, Cluster: "sample", Namespace: "bench", Subtypes: []string{"malta"}}
+	cfg := backend.Config{Backend: "argo", ID: "test", URL: "http://example.invalid", TokenFile: filepath.Join(t.TempDir(), "token"), RemoteResultsRoot: "/shared", LocalResultsRoot: t.TempDir(), MaxBytes: 1 << 30, TimeoutSeconds: 120, ArtifactBytes: 1 << 20, Cluster: "sample", Namespace: "bench"}
 	if e = os.WriteFile(cfg.TokenFile, []byte("test-token"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	m := &Manager{Store: s, enabled: true, ctx: ctx, connections: map[string]uce.Config{"test": cfg}, backends: map[string]backend.Backend{"test": &fakeBackend{}}}
+	m := &Manager{Store: s, enabled: true, ctx: ctx, connections: map[string]backend.Config{"test": cfg}, backends: map[string]backend.Backend{"test": &fakeBackend{}}}
 	if e = migrate(s); e != nil {
 		t.Fatal(e)
 	}
@@ -58,7 +57,7 @@ func fixture(t *testing.T) (*Manager, Selection, uce.Config) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	raw, _ = json.Marshal(Profile{Backend: "uce", Connection: "test", Cluster: "sample", Namespace: "bench", Node: "node", Queue: "default", Subtype: "malta", SystemIDs: []string{sys.ID}, Settings: map[string]any{"results_pvc": "shared-nas", "results_mount": "/shared", "node": "node"}})
+	raw, _ = json.Marshal(Profile{Backend: "argo", Connection: "test", Cluster: "sample", Namespace: "bench", Node: "node", SystemIDs: []string{sys.ID}, Settings: map[string]any{"results_pvc": "shared-nas", "results_mount": "/shared", "node": "node"}})
 	p, e := m.Save("profiles", SaveRecord{Name: "test profile", Body: raw})
 	if e != nil {
 		t.Fatal(e)
@@ -175,7 +174,7 @@ func TestEvidenceMissingStaleAndValid(t *testing.T) {
 	_ = os.MkdirAll(root, 0700)
 	report := []byte(`<testsuite><testcase name="test" classname="suite"/></testsuite>`)
 	_ = os.WriteFile(filepath.Join(root, "junit.xml"), report, 0600)
-	manifest := Evidence{SchemaVersion: "malta.evidence/v1", UCERunID: r.ExternalRunID, UCEVersionID: r.ExternalVersionID, SnapshotHash: r.Snapshot.Hash, NodeID: rule.NodeID, StageID: stage.ID, EnvironmentID: r.Snapshot.Environment.ID, SoftwareVersionID: r.Snapshot.Version.ID, Parser: "junit", Assertions: map[string]bool{}, Files: []EvidenceFile{{"junit.xml", domain.BytesHash(report), int64(len(report))}}}
+	manifest := Evidence{SchemaVersion: "malta.evidence/v1", ExternalRunID: r.ExternalRunID, ExternalVersionID: r.ExternalVersionID, SnapshotHash: r.Snapshot.Hash, NodeID: rule.NodeID, StageID: stage.ID, EnvironmentID: r.Snapshot.Environment.ID, SoftwareVersionID: r.Snapshot.Version.ID, Parser: "junit", Assertions: map[string]bool{}, Files: []EvidenceFile{{"junit.xml", domain.BytesHash(report), int64(len(report))}}}
 	save := func() {
 		raw, _ := json.Marshal(manifest)
 		_ = os.WriteFile(filepath.Join(root, "result.json"), raw, 0600)
@@ -308,7 +307,7 @@ func TestFioEvidenceAndFailedStageReport(t *testing.T) {
 	publish := func(parser, filename string, raw []byte) {
 		t.Helper()
 		_ = os.WriteFile(filepath.Join(root, filename), raw, 0600)
-		manifest := Evidence{SchemaVersion: "malta.evidence/v1", UCERunID: r.ExternalRunID, UCEVersionID: r.ExternalVersionID, SnapshotHash: r.Snapshot.Hash, NodeID: rule.NodeID, StageID: stage.ID, EnvironmentID: r.Snapshot.Environment.ID, SoftwareVersionID: r.Snapshot.Version.ID, Parser: parser, Assertions: map[string]bool{}, Files: []EvidenceFile{{filename, domain.BytesHash(raw), int64(len(raw))}}}
+		manifest := Evidence{SchemaVersion: "malta.evidence/v1", ExternalRunID: r.ExternalRunID, ExternalVersionID: r.ExternalVersionID, SnapshotHash: r.Snapshot.Hash, NodeID: rule.NodeID, StageID: stage.ID, EnvironmentID: r.Snapshot.Environment.ID, SoftwareVersionID: r.Snapshot.Version.ID, Parser: parser, Assertions: map[string]bool{}, Files: []EvidenceFile{{filename, domain.BytesHash(raw), int64(len(raw))}}}
 		data, _ := json.Marshal(manifest)
 		_ = os.WriteFile(filepath.Join(root, "result.json"), data, 0600)
 	}

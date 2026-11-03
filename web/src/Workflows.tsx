@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api, date } from "./model";
 import { Dialog, Empty } from "./components";
 import example from "./workflow-example.json";
-import nativeUCE from "./workflow-native-uce.json";
 import "./workflow.css";
 import { WorkflowIssues } from "./WorkflowIssues";
 
@@ -19,8 +18,10 @@ type Connection = {
 };
 const supportedBackends = (body: Record<string, any>) =>
   body.implementations
-    ? Object.keys(body.implementations)
-    : [body.backend || "uce"];
+    ? Object.keys(body.implementations).filter((kind) => kind === "argo")
+    : body.backend === "argo"
+      ? ["argo"]
+      : [];
 const connectionStatus = (c: Connection) =>
   !c.enabled
     ? "未启用"
@@ -30,27 +31,24 @@ const connectionStatus = (c: Connection) =>
 const nativeCase = (backend: string) => ({
   schema_version: "workflow/v1alpha1",
   backend,
-  template:
-    backend === "uce"
-      ? nativeUCE.body.template
-      : {
-          apiVersion: "argoproj.io/v1alpha1",
-          kind: "WorkflowTemplate",
-          metadata: { name: "hello" },
-          spec: {
-            entrypoint: "hello",
-            templates: [
-              {
-                name: "hello",
-                container: {
-                  image: "alpine:3.20",
-                  command: ["sh", "-c"],
-                  args: ["echo hello from Malta"],
-                },
-              },
-            ],
+  template: {
+    apiVersion: "argoproj.io/v1alpha1",
+    kind: "WorkflowTemplate",
+    metadata: { name: "hello" },
+    spec: {
+      entrypoint: "hello",
+      templates: [
+        {
+          name: "hello",
+          container: {
+            image: "alpine:3.20",
+            command: ["sh", "-c"],
+            args: ["echo hello from Malta"],
           },
         },
+      ],
+    },
+  },
   timeout_seconds: 600,
 });
 
@@ -295,7 +293,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           </h2>
           <p>
             {mode === "cases"
-              ? "原生 EP / Argo 模板随版本保存，结果解析可选。"
+              ? "原生 Argo 模板随版本保存，结果解析可选。"
               : mode === "runs"
                 ? "分别查看执行状态、证据完整性和验证结论。"
                 : "引用已登记的硬件与软件版本；连接凭据由服务端管理。"}
@@ -389,7 +387,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           {records.length === 0 && (
             <Empty
               title="还没有工作流配置"
-              text="从完整 EP 示例开始，保存为第一个版本。"
+              text="从完整 Argo 模板示例开始，保存为第一个版本。"
             />
           )}
         </div>
@@ -453,7 +451,6 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
                 }}
               >
                 <option value="">全部后端</option>
-                <option value="uce">UCE</option>
                 <option value="argo">Argo</option>
               </select>
             </label>
@@ -750,18 +747,16 @@ function RecordEditor({
 }) {
   const defaults =
     kind === "cases"
-      ? nativeCase("uce")
+      ? nativeCase("argo")
       : kind === "systems"
         ? { environment_id: "", software_version_id: "", settings: {} }
         : {
-            backend: "uce",
+            backend: "argo",
             connection: "",
             system_ids: [],
             cluster: "",
             namespace: "",
             node: "",
-            queue: "default",
-            subtype: "malta",
             settings: { results_pvc: "", results_mount: "", node: "" },
           };
   const [name, setName] = useState(initial?.name || ""),
@@ -821,9 +816,6 @@ function RecordEditor({
       <div className="wf-editor">
         {kind === "cases" && (
           <div className="wf-actions">
-            <button onClick={() => setJSON(pretty(nativeCase("uce")))}>
-              UCE 原生模板示例
-            </button>
             <button onClick={() => setJSON(pretty(nativeCase("argo")))}>
               Argo 原生模板示例
             </button>
@@ -867,13 +859,12 @@ function RecordEditor({
                 const data = v.body || v;
                 if (
                   kind === "cases" &&
-                  (data.root_dag_version_id ||
-                    data.apiVersion === "argoproj.io/v1alpha1")
+                  data.apiVersion === "argoproj.io/v1alpha1"
                 ) {
                   setJSON(
                     pretty({
                       schema_version: "workflow/v1alpha1",
-                      backend: data.root_dag_version_id ? "uce" : "argo",
+                      backend: "argo",
                       template: data,
                       timeout_seconds: 600,
                     }),
@@ -901,10 +892,9 @@ function RecordEditor({
         </label>
         {kind === "cases" && (
           <p>
-            可直接导入 EP 或 Argo 原生 JSON；不配置 results
-            时仅记录执行状态。账号密码由服务端 Secret
-            管理，不填入模板。多后端用例通过 implementations
-            分别保存原生模板，共用参数定义。
+            可直接导入 Argo 原生 JSON；不配置 results
+            时仅记录执行状态。账号密码由服务端 Secret 管理，不填入模板。当前支持
+            Argo Workflow / WorkflowTemplate。
           </p>
         )}
         {error && (
@@ -1150,7 +1140,7 @@ function Wizard({
                   setProfile(null);
                 }}
               >
-                {["uce", "argo"].map((kind) => (
+                {["argo"].map((kind) => (
                   <option
                     key={kind}
                     value={kind}
@@ -1279,7 +1269,7 @@ function Wizard({
                   字节 · 有效至 {date(check.expires_at)}
                 </p>
                 <details>
-                  <summary>查看最终 EP 与参数</summary>
+                  <summary>查看最终模板与参数</summary>
                   <pre>
                     {pretty({
                       ep: check.snapshot.ep,

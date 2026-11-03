@@ -1,6 +1,6 @@
-# 原生工作流托管：UCE / Argo
+# 原生工作流托管：Argo
 
-Malta 保存完整原生模板的不可变版本、参数与执行快照，通过后端适配器提交、查询、取消和恢复任务。**原生 EP / Argo Workflow 或 WorkflowTemplate 的语义由执行框架负责**；Malta 不维护自己的 DAG 语言、不转换两个框架的模板、不限制节点必须采用某种算子/依赖/重试形式，也不再内嵌 UCE Schema 副本。
+Malta 保存完整原生模板的不可变版本、参数与执行快照，通过后端适配器提交、查询、取消和恢复任务。**原生 Argo Workflow 或 WorkflowTemplate 的语义由 Argo 负责**；Malta 不维护自己的 DAG 语言、不转换工作流模板、不限制节点必须采用某种算子/依赖/重试形式。
 
 结果解析可选。只保存模板时，Malta 记录后端执行状态和原始详情；`succeeded` 表示执行成功，`result_state=not_configured`、`verdict=not_evaluated`，不会将其算作测试通过或修复验证。配置 fio/JUnit/assertions 解析后才进入证据校验、指标对比与修复验证链路。旧 Plan、混合场景、Kubernetes Job 与历史记录保留。
 
@@ -8,9 +8,9 @@ Malta 保存完整原生模板的不可变版本、参数与执行快照，通�
 
 测试中心的“工作流测试”可按 **后端 / 执行入口** 筛选分页历史。入口展示未启用、待配置 Secret 或凭据文件已就绪；文件就绪不代表业务权限已经验证。没有可用入口时不能提交，但仍可管理原生模板。
 
-发起顺序为 **用例版本 → 被测系统 → 执行配置 → 软件版本 → 参数 → 预检查 → 提交**。执行配置步骤选择 UCE 或 Argo，仅提供当前用例版本支持的后端和匹配系统的配置。切换配置清除预检查；已提交运行固定后端、连接指纹和模板版本，不能迁移运行中的任务。
+发起顺序为 **用例版本 → 被测系统 → 执行配置 → 软件版本 → 参数 → 预检查 → 提交**。执行配置步骤选择 Argo 入口和匹配被测系统的配置。切换配置清除预检查；已提交运行固定后端、连接指纹和模板版本，不能迁移运行中的任务。
 
-用例管理可导入完整 EP 或 Argo 原生 JSON，自动包裹为 Malta 用例；也可导入完整用例 JSON。Argo YAML 可先转换为等价 JSON，保存的仍是原生对象。多个后端共享一个逻辑用例时使用 `implementations`，分别保存各自模板，不进行自动转换。
+用例管理可导入Argo 原生 JSON，自动包裹为 Malta 用例；也可导入完整用例 JSON。Argo YAML 可先转换为等价 JSON，保存的仍是原生对象。当前只支持 Argo；保留 `implementations` 扩展结构，但仅接受 `implementations.argo`。
 
 ## 用例结构
 
@@ -27,18 +27,16 @@ Malta 保存完整原生模板的不可变版本、参数与执行快照，通�
 
 以上 `spec` 需填成有效原生模板；空 spec 不代表可执行。完整示例：
 
-- [UCE 原生模板](examples/workflow/native-uce.example.json)
 - [Argo 原生模板](examples/workflow/native-argo.example.json)
-- [同一用例的两个后端实现](examples/workflow/multi-backend.example.json)
-- [UCE 可选 JUnit 结果解析](examples/workflow/case.example.json)
+- [带客户端/PVC 绑定的 Argo 用例](examples/workflow/case.example.json)
 - [Argo 可选 JUnit 结果解析](examples/workflow/argo-evidence.example.json)
 - [被测系统](examples/workflow/system.example.json)与[执行配置](examples/workflow/profile.example.json)
 
 共同字段：`parameters`（可选的封闭 JSON Schema）、`defaults`、`dataset`（可选的数据预算声明）、`timeout_seconds`。未声明 Schema 时，参数使用原生 JSON 对象，由后端校验；未指定 timeout 时采用连接预算与 600 秒中的较小值。
 
-单后端使用 `backend/template/bindings/results`；多后端使用 `implementations.uce` 与 `implementations.argo`，各自包含 `template`、可选 `bindings/results`，不能同时填写两种形式。执行配置选择具体实现，解析后的定义进入不可变快照。
+推荐使用 `backend: argo` 配合 `template/bindings/results`；也可使用 `implementations.argo` 包含 `template`、可选 `bindings/results`，不能同时填写两种形式。执行配置选择具体实现，解析后的定义进入不可变快照。
 
-可选 `bindings` 只替换已有的原生 workload spec JSON Pointer，值来自版本化 system/profile settings；不做字符串模板拼接。UCE 已绑定内容生成新的根 DAG version ID，原始用例模板保留不变；其余原生语义仍交由 UCE。输入名 `malta_context` 保留，只有模板显式声明它时才注入；启用结果解析必须声明该输入。
+可选 `bindings` 只替换已有的原生 workload spec JSON Pointer，值来自版本化 system/profile settings；不做字符串模板拼接。绑定后的模板按内容登记，原始用例版本保留不变。输入名 `malta_context` 保留，只有模板显式声明它时才注入；启用结果解析必须声明该输入。
 
 Malta 只校验基本模板封装、backend/namespace 与已选执行配置一致、参数 Schema（如有）、预算和结果规则。原生模板中的节点调度、PVC、Secret、重试、嵌套 DAG、循环等由模板作者与后端管理；Malta 不会伪称预检查已验收现场挂载或固定客户端。Profile 的 node 可省略；提供时应与已登记环境元数据一致。
 
@@ -51,24 +49,24 @@ bin/malta serve --listen 0.0.0.0:8080 --data-dir /var/lib/malta \
   --workflow-config /etc/malta-workflows/workflow.yaml
 ```
 
-每个 connection 包含 `id`、`backend`（uce/argo）、`enabled`、URL、`auth`、执行范围和预算。未填 backend 的旧 connection 默认为 UCE；旧 `token_file` 仍兼容，但不能与 `auth` 同时设置。未启用连接可提前登记，不要求文件已存在或路由已填完。只有启用连接才创建执行适配器。
+每个 connection 包含 `id`、显式 `backend: argo`、`enabled`、URL、`auth`、执行范围和预算。缺省或不支持的 backend 明确报错；`token_file` 仍支持，但不能与 `auth` 同时设置。未启用连接可提前登记，不要求文件已存在或路由已填完。只有启用连接才创建执行适配器。
 
 `auth.type` 支持文件 Bearer Token、OAuth2 账号密码和 Client Credentials。账号密码/client secret 由 Secret 挂载文件读取；Token/Refresh Token 留在内存，到期前续期，同一入口串行刷新。刷新令牌失效时重新认证；Secret 轮换使缓存失效；重启重新登录。明确 401 才刷新并重试一次，保持请求体与幂等身份；网络故障交由运行恢复逻辑处理。
 
-`--management-only` 与 `--workflow-config` 互斥。旧执行器与工作流执行器的锁独立，不能据此保证跨执行器互斥；使用时需安排资源隔离，避免同时压测同一系统。URL 和认证配置由管理员控制，Profile 只能引用 connection ID。登录成功不证明 UCE/Argo 业务权限完整。
+`--management-only` 与 `--workflow-config` 互斥。旧执行器与工作流执行器的锁独立，不能据此保证跨执行器互斥；使用时需安排资源隔离，避免同时压测同一系统。URL 和认证配置由管理员控制，Profile 只能引用 connection ID。登录成功不证明 Argo 业务权限完整。
 
 只有配置结果解析时才要求 `remote_results_root/local_results_root`：它们必须是执行 Pod 与 Malta Server 可见的同一 NAS 目录。当前不提供跨集群下载器或 OSS 产物解析器；native-only 模板可以自行使用 OSS 等存储，后端原始输出引用保留在运行详情中。
 
 ## 后端生命周期与恢复
 
-| 操作 | UCE | Argo Server REST API |
-| --- | --- | --- |
-| 准备模板 | 注册完整 EP | 创建按内容寻址的 WorkflowTemplate，同名不覆盖 |
-| 提交 | 固定幂等键创建 Run | 确定性 Workflow 名称，以原生已核验 spec 创建 Workflow |
-| 恢复 | 根据幂等键查询 | 根据确定性名称及 annotation 查询，再绑定 Workflow UID |
-| 状态 | Run / Stage 状态 | Workflow phase / node status |
-| 取消 | 请求取消并等待后端确认 | terminate 后等待 Workflow 和 Pod node 终态 |
-| 可选结果路径 | output registration | node outputs.parameters 的值 |
+| 操作 | Argo Server REST API |
+| --- | --- |
+| 准备模板 | 创建按内容寻址的 WorkflowTemplate，同名不覆盖 |
+| 提交 | 确定性 Workflow 名称，使用已核验 spec 创建 Workflow |
+| 恢复 | 按名称及 annotation 查询并校验 Workflow UID |
+| 状态 | Workflow phase / node status |
+| 取消 | terminate 后等待 Workflow 和 Pod node 终态 |
+| 可选结果路径 | node outputs.parameters 的值 |
 
 Argo 注册/提交使用原生 API 的校验；不在 Malta 重新实现 Argo schema。Workflow 使用登记模板的已核验内容副本，避免运行中模板被修改。提交参数只覆盖同名输入，保留模板默认参数和 artifact 输入；模板自身更短的执行时限也保留。root labels/annotations 纳入模板内容并传给 Workflow；保留前缀 `malta.dev/`。返回身份包含 `Workflow name.UID`，同名资源被删除重建时拒绝串接。若 Argo API 只返回压缩/外置 node status，需提供已展开的节点响应才可解析证据；原生运行状态仍可查询。
 
@@ -84,8 +82,8 @@ Argo 原生重试/循环可运行。解析规则的 `node_id` 对应 node.name �
 {
   "schema_version": "malta.evidence/v1",
   "workflow_version_id": "从 malta_context 获取",
-  "run_id": "UCE Run ID 或 Argo Workflow name.UID",
-  "node_id": "UCE definition_node_id 或 Argo 逻辑节点路径",
+  "run_id": "Argo Workflow name.UID",
+  "node_id": "Argo 逻辑节点路径",
   "stage_run_id": "实际 stage ID",
   "attempt": 0,
   "eviction_count": 0,
@@ -98,7 +96,7 @@ Argo 原生重试/循环可运行。解析规则的 `node_id` 对应 node.name �
 }
 ```
 
-UCE 从实际 stage 渲染上下文获取 run/stage/attempt/eviction_count；Argo 从 Workflow 名称、UID 和 Pod 的 node-id annotation 构造身份（见 Argo 证据示例）。不能写死或使用上次值。先完成原始报告写入，再在同一目录用临时文件 + rename 原子发布 manifest。完整示例包括这段逻辑。
+Argo 从 Workflow 名称、UID 和 Pod 的 node-id annotation 构造身份（见 Argo 证据示例）。不能写死或使用上次值。先完成原始报告写入，再在同一目录用临时文件 + rename 原子发布 manifest。完整示例包括这段逻辑。
 
 验证内容包括运行、版本、节点、attempt、驱逐次数、快照和环境身份；路径必须位于批准的共享根目录并包含当前 run ID；拒绝路径穿越和符号链接；校验所有原始文件大小与 SHA-256，按内容哈希归档。总证据上限 32 MiB（连接可收紧），最多 64 个文件。超限不截断为成功。
 
@@ -160,10 +158,15 @@ API 根路径 `/api/v1/workflow`。对应 `connections`、`records/{cases|system
 
 ## 存储与验收边界
 
-继续使用 `workflow_records`、`workflow_preflights`、`workflow_runs`、`workflow_issue_links`；不迁移或改写既有业务数据。配置新增字段可省略，旧 UCE Token 文件配置与连接指纹保持兼容。保存完整模板、选定实现、参数及执行快照；凭据不进入快照、API 响应或错误正文。
+继续使用 `workflow_records`、`workflow_preflights`、`workflow_runs`、`workflow_issue_links`；不迁移或改写既有业务数据。已有非 Argo 配置不能用于本版本提交。更新连接配置后必须重新预检查；已有历史记录保留，不转换或重新执行。保存完整模板、选定实现、参数及执行快照；凭据不进入快照、API 响应或错误正文。
 
-列表 API 支持 `GET /api/v1/workflow/runs?backend=argo&connection=sample-dev-argo&limit=20&offset=0`，过滤在分页之前执行。
+列表 API 支持 `GET /api/v1/workflow/runs?backend=argo&connection=example-argo&limit=20&offset=0`，过滤在分页之前执行。
 
-代码验收使用开发机上的模拟 Keycloak、UCE、Argo REST 接口与共享证据目录。它验证协议、恢复和解析逻辑，不等价于真实集群授权/CSI/控制器验收；本次代码变更不自动更新现有集群镜像，也不创建账号或真实 Secret。
+代码验收使用开发机上的模拟 OAuth 和 Argo REST 接口与共享证据目录。它验证协议、恢复和解析逻辑，不等价于真实集群授权/CSI/控制器验收；本次代码变更不自动更新现有集群镜像，也不创建账号或真实 Secret。
 
 协议依据：[Argo REST API](https://argo-workflows.readthedocs.io/en/latest/swagger/)、[Argo 模板变量](https://argo-workflows.readthedocs.io/en/latest/variables/)、[Keycloak Grant Types](https://github.com/keycloak/keycloak/blob/main/docs/guides/securing-apps/partials/oidc/supported-grant-types.adoc)。
+
+
+## Agent 提示词
+
+使用[工作流测试提示词](agent-workflow-benchmark-prompt.md)填写 Argo 用例、执行配置和验收条件。公开仓库不提供现成的 OSS/缓存预热/fio 三阶段工具镜像；使用此流程前需要自行提供对应 Argo 模板与工具，并逐项验证其证据输出。

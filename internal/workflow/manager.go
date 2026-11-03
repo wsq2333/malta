@@ -10,7 +10,6 @@ import (
 	"github.com/wsq2333/malta/internal/backend/argo"
 	"github.com/wsq2333/malta/internal/backend/auth"
 	"github.com/wsq2333/malta/internal/backend/httpapi"
-	"github.com/wsq2333/malta/internal/backend/uce"
 	"github.com/wsq2333/malta/internal/domain"
 	"github.com/wsq2333/malta/internal/store"
 	"os"
@@ -56,7 +55,7 @@ func New(s *store.Store, c Config, enabled bool) (*Manager, error) {
 		return nil, e
 	}
 	for _, v := range c.Connections {
-		if domain.CheckID(v.ID) != nil || m.connections[v.ID].ID != "" || (v.Kind() != "uce" && v.Kind() != "argo") {
+		if domain.CheckID(v.ID) != nil || m.connections[v.ID].ID != "" || v.Kind() != "argo" {
 			cancel()
 			return nil, domain.E("invalid", "invalid/duplicate connection ID or unsupported backend")
 		}
@@ -71,7 +70,7 @@ func New(s *store.Store, c Config, enabled bool) (*Manager, error) {
 		if !v.Active() {
 			continue
 		}
-		if v.Cluster == "" || v.Namespace == "" || (v.Kind() == "uce" && len(v.Subtypes) == 0) || v.MaxBytes < 1 || v.TimeoutSeconds < 1 || v.TimeoutSeconds > 86400 || v.ArtifactBytes < 1 || v.ArtifactBytes > 32<<20 {
+		if v.Cluster == "" || v.Namespace == "" || v.MaxBytes < 1 || v.TimeoutSeconds < 1 || v.TimeoutSeconds > 86400 || v.ArtifactBytes < 1 || v.ArtifactBytes > 32<<20 {
 			cancel()
 			return nil, domain.E("invalid", "invalid workflow route or budget")
 		}
@@ -84,23 +83,14 @@ func New(s *store.Store, c Config, enabled bool) (*Manager, error) {
 				return nil, domain.E("invalid", "result roots must be clean absolute non-root paths")
 			}
 		}
-		if v.Kind() == "uce" {
-			client, e := uce.New(v)
-			if e != nil {
-				cancel()
-				return nil, e
-			}
-			m.backends[v.ID] = client
-			m.credentials[v.ID] = client.Auth
-		} else {
-			client, e := argo.New(v)
-			if e != nil {
-				cancel()
-				return nil, e
-			}
-			m.backends[v.ID] = client
-			m.credentials[v.ID] = client.Auth
+
+		client, e := argo.New(v)
+		if e != nil {
+			cancel()
+			return nil, e
 		}
+		m.backends[v.ID] = client
+		m.credentials[v.ID] = client.Auth
 	}
 	go m.loop()
 	return m, nil
@@ -144,7 +134,7 @@ func (m *Manager) Connections() []map[string]any {
 		if kind == "" {
 			kind = "bearer_token_file"
 		}
-		out = append(out, map[string]any{"id": c.ID, "backend": c.Kind(), "url": c.URL, "cluster": c.Cluster, "namespace": c.Namespace, "subtypes": c.Subtypes, "max_bytes": c.MaxBytes, "timeout_seconds": c.TimeoutSeconds, "enabled": c.Active() && m.enabled, "available": c.Active() && m.enabled && state == "configured", "auth_type": kind, "auth_status": state})
+		out = append(out, map[string]any{"id": c.ID, "backend": c.Kind(), "url": c.URL, "cluster": c.Cluster, "namespace": c.Namespace, "max_bytes": c.MaxBytes, "timeout_seconds": c.TimeoutSeconds, "enabled": c.Active() && m.enabled, "available": c.Active() && m.enabled && state == "configured", "auth_type": kind, "auth_status": state})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["id"].(string) < out[j]["id"].(string) })
 	return out
@@ -339,7 +329,7 @@ func (m *Manager) advance(r *Run) {
 	_ = json.Unmarshal(r.Snapshot.Profile.Body, &p)
 	b := m.backends[p.Connection]
 	cfg, ok := m.connections[p.Connection]
-	if !ok || b == nil || connectionHash(cfg) != r.Snapshot.ConnectionHash {
+	if p.Backend != "argo" || !ok || b == nil || cfg.Kind() != p.Backend || connectionHash(cfg) != r.Snapshot.ConnectionHash {
 		r.Error = "workflow connection missing or changed; restore the snapshotted connection to resume"
 		return
 	}
@@ -410,7 +400,7 @@ func (m *Manager) advance(r *Run) {
 			}
 			return
 		}
-		id, e := b.Submit(m.ctx, backend.Submission{VersionID: r.ExternalVersionID, Key: r.Key, Name: r.ID, Inputs: submissionInputs(*r), Queue: p.Queue, Subtype: p.Subtype, TimeoutSeconds: r.Snapshot.Definition.TimeoutSeconds})
+		id, e := b.Submit(m.ctx, backend.Submission{VersionID: r.ExternalVersionID, Key: r.Key, Name: r.ID, Inputs: submissionInputs(*r), TimeoutSeconds: r.Snapshot.Definition.TimeoutSeconds})
 		if e != nil {
 			r.Error = e.Error()
 			var he *backend.HTTPError

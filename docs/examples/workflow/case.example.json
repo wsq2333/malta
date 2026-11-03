@@ -1,166 +1,133 @@
 {
-  "base_revision": 0,
-  "name": "工作流证据链路示例",
-  "description": "只验证 DAG 提交与 JUnit 证据回收，不代表文件系统性能或正确性验收。部署前替换为经过验证且固定 digest 的工具镜像。",
-  "change_note": "首次创建",
+  "name": "Argo JUnit 证据回收示例",
+  "description": "原生 Argo DAG，写入 JUnit 报告并通过共享结果卷回收和校验证据。",
   "body": {
     "schema_version": "workflow/v1alpha1",
-    "backend": "uce",
+    "backend": "argo",
     "template": {
-      "schema_version": "0.1.0",
-      "root_dag_version_id": "99999999-6666-4666-8666-666666666601",
-      "dag_definitions": [
-        {
-          "dag_id": "66666666-6666-4666-8666-666666666611",
-          "dag_version_id": "99999999-6666-4666-8666-666666666601",
-          "version": "1.0.0",
-          "name": "malta-evidence-smoke",
-          "inputs": [
+      "apiVersion": "argoproj.io/v1alpha1",
+      "kind": "WorkflowTemplate",
+      "metadata": {
+        "name": "malta-native-hello"
+      },
+      "spec": {
+        "entrypoint": "main",
+        "arguments": {
+          "parameters": [
             {
-              "id": "ctx",
-              "name": "malta_context",
-              "type": "json"
+              "name": "malta_context"
             }
-          ],
-          "outputs": [],
-          "nodes": [
-            {
-              "definition_node_id": "66666666-6666-4666-8666-666666666601",
-              "name": "source-node",
-              "kind": "operator",
-              "target_version_id": "88888888-8888-4888-8888-000000000001",
-              "input_bindings": {
-                "malta_context": {
-                  "kind": "dag_input",
-                  "input_id": "ctx"
-                }
-              },
-              "input_path": []
+          ]
+        },
+        "volumes": [
+          {
+            "name": "results",
+            "persistentVolumeClaim": {
+              "claimName": "replace-shared-results-pvc"
             }
-          ],
-          "output_bindings": {}
-        }
-      ],
-      "operator_definitions": [
-        {
-          "resource_pool": "ecs",
-          "operator_id": "77777777-7777-4777-8777-000000000001",
-          "operator_version_id": "88888888-8888-4888-8888-000000000001",
-          "version": "1.0.0",
-          "name": "source",
-          "inputs": [
-            {
-              "name": "malta_context",
-              "type": "json"
-            }
-          ],
-          "outputs": [],
-          "manifest": {
-            "apiVersion": "v1",
-            "kind": "Pod",
-            "metadata": {
-              "name": "source"
-            },
-            "spec": {
-              "restartPolicy": "Never",
-              "containers": [
+          }
+        ],
+        "templates": [
+          {
+            "name": "main",
+            "dag": {
+              "tasks": [
                 {
-                  "name": "main",
-                  "image": "python:3.12-alpine",
-                  "command": [
-                    "python",
-                    "-c"
-                  ],
-                  "args": [
-                    "import hashlib,json,os\nfrom pathlib import Path\ncontext=json.loads(os.environ[\"MALTA_CONTEXT\"])\nfor dest in json.loads(os.environ[\"MAREA_OUTPUT_PATHS\"]):\n    path=Path(dest);path.parent.mkdir(parents=True,exist_ok=True)\n    raw=b'<testsuite tests=\"1\"><testcase classname=\"malta.smoke\" name=\"arithmetic\"/></testsuite>'\n    assert 2+2==4\n    report=path.parent/\"junit.xml\"\n    tmp=report.with_suffix('.tmp');tmp.write_bytes(raw);tmp.replace(report)\n    manifest={\"schema_version\":\"malta.evidence/v1\",\"workflow_version_id\":context[\"workflow_version_id\"],\"snapshot_hash\":context[\"snapshot_hash\"],\"run_id\":os.environ[\"RUN_ID\"],\"node_id\":\"66666666-6666-4666-8666-666666666601\",\"stage_run_id\":os.environ[\"STAGE_ID\"],\"attempt\":int(os.environ[\"ATTEMPT\"]),\"eviction_count\":int(os.environ[\"EVICTION_COUNT\"]),\"environment_id\":context[\"environment_id\"],\"software_version_id\":context[\"software_version_id\"],\"parser\":\"junit\",\"assertions\":{},\"files\":[{\"path\":\"junit.xml\",\"size\":len(raw),\"sha256\":hashlib.sha256(raw).hexdigest()}]}\n    tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(manifest));tmp.replace(path)\n"
-                  ],
-                  "resources": {
-                    "requests": {
-                      "cpu": "100m",
-                      "memory": "64Mi"
-                    },
-                    "limits": {
-                      "cpu": "1",
-                      "memory": "128Mi"
-                    }
-                  },
-                  "volumeMounts": [
-                    {
-                      "name": "shared",
-                      "mountPath": "/shared"
-                    }
-                  ],
-                  "env": {
-                    "MALTA_CONTEXT": "{{ toJson .task_params.malta_context }}",
-                    "RUN_ID": "{{ .pending_task.run_id }}",
-                    "STAGE_ID": "{{ .pending_task.stagerun_id }}",
-                    "ATTEMPT": "{{ .pending_task.attempt }}",
-                    "EVICTION_COUNT": "{{ .pending_task.eviction_count }}"
-                  }
+                  "name": "check",
+                  "template": "check"
                 }
-              ],
-              "volumes": [
-                {
-                  "name": "shared",
-                  "persistentVolumeClaim": {
-                    "claimName": "shared-nas"
-                  }
-                }
-              ],
-              "nodeSelector": {
-                "kubernetes.io/hostname": "example-node"
-              }
+              ]
             }
           },
-          "output_path": [
-            {
-              "name": "result",
-              "path": "${output_root}/marea/${run_id}/${stage_run_id}/${attempt}/output.json"
+          {
+            "name": "check",
+            "outputs": {
+              "parameters": [
+                {
+                  "name": "evidence",
+                  "valueFrom": {
+                    "path": "/tmp/evidence-path"
+                  }
+                }
+              ]
+            },
+            "container": {
+              "image": "python:3.12-alpine",
+              "command": [
+                "python",
+                "-c"
+              ],
+              "args": [
+                "import os,json,hashlib\nfrom pathlib import Path\nctx=json.loads(os.environ['MALTA_CONTEXT'])\nrun_id=os.environ['WORKFLOW_NAME']+'.'+os.environ['WORKFLOW_UID']\nstage_id=os.environ['NODE_ID']\nassert stage_id\nfolder=Path('/results')/run_id/stage_id\nfolder.mkdir(parents=True,exist_ok=True)\nraw=b'<testsuite tests=\"1\"><testcase classname=\"native\" name=\"arithmetic\"/></testsuite>'\nassert 2+2==4\n(folder/'junit.xml.tmp').write_bytes(raw)\n(folder/'junit.xml.tmp').replace(folder/'junit.xml')\nmanifest={'schema_version':'malta.evidence/v1','workflow_version_id':ctx['workflow_version_id'],'snapshot_hash':ctx['snapshot_hash'],'run_id':run_id,'node_id':'check','stage_run_id':stage_id,'attempt':0,'eviction_count':0,'environment_id':ctx['environment_id'],'software_version_id':ctx['software_version_id'],'parser':'junit','assertions':{},'files':[{'path':'junit.xml','size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}]}\n(folder/'manifest.tmp').write_text(json.dumps(manifest))\n(folder/'manifest.tmp').replace(folder/'manifest.json')\nPath('/tmp/evidence-path').write_text(str(folder/'manifest.json'))\n"
+              ],
+              "env": [
+                {
+                  "name": "MALTA_CONTEXT",
+                  "value": "{{workflow.parameters.malta_context}}"
+                },
+                {
+                  "name": "WORKFLOW_NAME",
+                  "value": "{{workflow.name}}"
+                },
+                {
+                  "name": "WORKFLOW_UID",
+                  "value": "{{workflow.uid}}"
+                },
+                {
+                  "name": "NODE_ID",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "fieldPath": "metadata.annotations['workflows.argoproj.io/node-id']"
+                    }
+                  }
+                }
+              ],
+              "volumeMounts": [
+                {
+                  "name": "results",
+                  "mountPath": "/results"
+                }
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "128Mi"
+                }
+              }
             }
-          ],
-          "execution": {
-            "maxRetry": 0
           }
+        ],
+        "nodeSelector": {
+          "kubernetes.io/hostname": "replace-client-node"
         }
-      ],
-      "artifact_contract": "paths-v1"
+      }
     },
-    "parameters": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {}
-    },
-    "defaults": {},
+    "timeout_seconds": 60,
+    "results": [
+      {
+        "node_id": "check",
+        "output": "evidence",
+        "parser": "junit",
+        "required": true
+      }
+    ],
     "bindings": [
       {
-        "pointer": "/operator_definitions/0/manifest/spec/volumes/0/persistentVolumeClaim/claimName",
+        "pointer": "/spec/volumes/0/persistentVolumeClaim/claimName",
         "source": "profile",
         "key": "results_pvc"
       },
       {
-        "pointer": "/operator_definitions/0/manifest/spec/containers/0/volumeMounts/0/mountPath",
-        "source": "profile",
-        "key": "results_mount"
-      },
-      {
-        "pointer": "/operator_definitions/0/manifest/spec/nodeSelector/kubernetes.io~1hostname",
+        "pointer": "/spec/nodeSelector/kubernetes.io~1hostname",
         "source": "profile",
         "key": "node"
       }
-    ],
-    "results": [
-      {
-        "node_id": "66666666-6666-4666-8666-666666666601",
-        "output": "result",
-        "parser": "junit",
-        "required": true,
-        "assertions": []
-      }
-    ],
-    "dataset": {
-      "file_size_parameter": "",
-      "file_count_parameter": ""
-    },
-    "timeout_seconds": 120
-  }
+    ]
+  },
+  "base_revision": 0,
+  "change_note": "首次登记"
 }

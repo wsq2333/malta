@@ -51,7 +51,7 @@ func (m *Manager) Save(kind string, q SaveRecord) (Record, error) {
 		if e := domain.DecodeJSON(strings.NewReader(string(q.Body)), &p); e != nil {
 			return r, domain.E("invalid", e.Error())
 		}
-		if (p.Backend != "uce" && p.Backend != "argo") || p.Connection == "" || p.Cluster == "" || p.Namespace == "" || len(p.SystemIDs) == 0 {
+		if p.Backend != "argo" || p.Connection == "" || p.Cluster == "" || p.Namespace == "" || len(p.SystemIDs) == 0 {
 			return r, domain.E("invalid", "workflow profile requires connection, cluster, namespace, node and allowed systems")
 		}
 	}
@@ -146,7 +146,7 @@ func (m *Manager) Runs(limit, offset int) ([]Run, error) {
 	return m.FilteredRuns(limit, offset, "", "")
 }
 func (m *Manager) FilteredRuns(limit, offset int, kind, connection string) ([]Run, error) {
-	if kind != "" && kind != "uce" && kind != "argo" {
+	if kind != "" && kind != "argo" {
 		return nil, domain.E("invalid", "unknown backend filter")
 	}
 	if limit < 1 || limit > 100 || offset < 0 {

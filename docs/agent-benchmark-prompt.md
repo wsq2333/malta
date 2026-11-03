@@ -1,5 +1,7 @@
 # Malta 性能测试 Agent 提示词（填空模板）
 
+> 本文适用于原有 Plan / Kubernetes 或 local 执行。Argo 原生工作流使用[工作流提示词模板](agent-workflow-benchmark-prompt.md)，两套提交命令和成功条件不能混用。
+
 请通过 Malta 完成以下性能测试。将【…】替换为实际值；不适用项填写“无”。本模板是给 Agent 的任务说明，不是可直接提交的 Plan JSON。
 
 ## 1. 任务与范围

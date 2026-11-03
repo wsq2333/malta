@@ -55,7 +55,7 @@ func workflowCommands(root *cobra.Command, o *Options) {
 			c.Flags().StringVar(&history, "id", "", "List immutable history for this record ID")
 		}
 		if name == "list" {
-			c.Flags().StringVar(&backendFilter, "backend", "", "Filter uce or argo before pagination")
+			c.Flags().StringVar(&backendFilter, "backend", "", "Filter argo before pagination")
 			c.Flags().StringVar(&connectionFilter, "connection", "", "Filter connection ID before pagination")
 			c.Flags().IntVar(&limit, "limit", 20, "Page size (1..100)")
 			c.Flags().IntVar(&offset, "offset", 0, "Page offset")
