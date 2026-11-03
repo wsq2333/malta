@@ -1,0 +1,116 @@
+{
+  "name": "Argo JUnit 证据回收示例",
+  "description": "完整原生模板；不配置结果解析",
+  "body": {
+    "schema_version": "workflow/v1alpha1",
+    "backend": "argo",
+    "template": {
+      "apiVersion": "argoproj.io/v1alpha1",
+      "kind": "WorkflowTemplate",
+      "metadata": {
+        "name": "malta-native-hello"
+      },
+      "spec": {
+        "entrypoint": "main",
+        "arguments": {
+          "parameters": [
+            {
+              "name": "malta_context"
+            }
+          ]
+        },
+        "volumes": [
+          {
+            "name": "results",
+            "persistentVolumeClaim": {
+              "claimName": "replace-shared-results-pvc"
+            }
+          }
+        ],
+        "templates": [
+          {
+            "name": "main",
+            "dag": {
+              "tasks": [
+                {
+                  "name": "check",
+                  "template": "check"
+                }
+              ]
+            }
+          },
+          {
+            "name": "check",
+            "outputs": {
+              "parameters": [
+                {
+                  "name": "evidence",
+                  "valueFrom": {
+                    "path": "/tmp/evidence-path"
+                  }
+                }
+              ]
+            },
+            "container": {
+              "image": "python:3.12-alpine",
+              "command": [
+                "python",
+                "-c"
+              ],
+              "args": [
+                "import os,json,hashlib\nfrom pathlib import Path\nctx=json.loads(os.environ['MALTA_CONTEXT'])\nrun_id=os.environ['WORKFLOW_NAME']+'.'+os.environ['WORKFLOW_UID']\nstage_id=os.environ['NODE_ID']\nassert stage_id\nfolder=Path('/results')/run_id/stage_id\nfolder.mkdir(parents=True,exist_ok=True)\nraw=b'<testsuite tests=\"1\"><testcase classname=\"native\" name=\"arithmetic\"/></testsuite>'\nassert 2+2==4\n(folder/'junit.xml.tmp').write_bytes(raw)\n(folder/'junit.xml.tmp').replace(folder/'junit.xml')\nmanifest={'schema_version':'malta.evidence/v1','workflow_version_id':ctx['workflow_version_id'],'snapshot_hash':ctx['snapshot_hash'],'run_id':run_id,'node_id':'check','stage_run_id':stage_id,'attempt':0,'eviction_count':0,'environment_id':ctx['environment_id'],'software_version_id':ctx['software_version_id'],'parser':'junit','assertions':{},'files':[{'path':'junit.xml','size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}]}\n(folder/'manifest.tmp').write_text(json.dumps(manifest))\n(folder/'manifest.tmp').replace(folder/'manifest.json')\nPath('/tmp/evidence-path').write_text(str(folder/'manifest.json'))\n"
+              ],
+              "env": [
+                {
+                  "name": "MALTA_CONTEXT",
+                  "value": "{{workflow.parameters.malta_context}}"
+                },
+                {
+                  "name": "WORKFLOW_NAME",
+                  "value": "{{workflow.name}}"
+                },
+                {
+                  "name": "WORKFLOW_UID",
+                  "value": "{{workflow.uid}}"
+                },
+                {
+                  "name": "NODE_ID",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "fieldPath": "metadata.annotations['workflows.argoproj.io/node-id']"
+                    }
+                  }
+                }
+              ],
+              "volumeMounts": [
+                {
+                  "name": "results",
+                  "mountPath": "/results"
+                }
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "128Mi"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "timeout_seconds": 600,
+    "results": [
+      {
+        "node_id": "check",
+        "output": "evidence",
+        "parser": "junit",
+        "required": true
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import (
 	kube "github.com/wsq2333/malta/internal/executor/kubernetes"
 	"github.com/wsq2333/malta/internal/runner"
 	"github.com/wsq2333/malta/internal/store"
+	"github.com/wsq2333/malta/internal/workflow"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,8 @@ import (
 )
 
 type Config struct {
+	Workflows workflow.Config
+
 	ManagementOnly bool
 	Kubernetes     *kube.Executor
 	AllowedRoots   []string
@@ -25,6 +28,8 @@ type Config struct {
 	Timeout        time.Duration
 }
 type Manager struct {
+	Workflows *workflow.Manager
+
 	Store  *store.Store
 	Config Config
 	mu     sync.Mutex
@@ -44,10 +49,10 @@ type StartRequest struct {
 }
 
 func New(s *store.Store, c Config) (*Manager, error) {
-	if c.ManagementOnly && (len(c.AllowedRoots) > 0 || c.Kubernetes != nil) {
+	if c.ManagementOnly && (len(c.AllowedRoots) > 0 || c.Kubernetes != nil || len(c.Workflows.Connections) > 0) {
 		return nil, domain.E("invalid", "management-only cannot configure execution backends")
 	}
-	if !c.ManagementOnly && len(c.AllowedRoots) == 0 && c.Kubernetes == nil {
+	if !c.ManagementOnly && len(c.AllowedRoots) == 0 && c.Kubernetes == nil && len(c.Workflows.Connections) == 0 {
 		return nil, domain.E("invalid", "at least one --allow-target is required")
 	}
 	if c.MaxBytes <= 0 || c.Timeout <= 0 {
@@ -79,6 +84,13 @@ func New(s *store.Store, c Config) (*Manager, error) {
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	m := &Manager{Store: s, Config: c, ctx: ctx, stop: stop, done: make(chan struct{}), unlock: unlock}
+	wm, e := workflow.New(s, c.Workflows, !c.ManagementOnly)
+	if e != nil {
+		stop()
+		unlock()
+		return nil, e
+	}
+	m.Workflows = wm
 	go m.loop()
 	return m, nil
 }
@@ -206,7 +218,7 @@ func (m *Manager) Cancel(id string) (domain.Run, error) {
 	}
 	return r, e
 }
-func (m *Manager) Close() { m.stop(); <-m.done; m.unlock() }
+func (m *Manager) Close() { m.Workflows.Close(); m.stop(); <-m.done; m.unlock() }
 func (m *Manager) loop() {
 	defer close(m.done)
 	if m.Config.ManagementOnly {

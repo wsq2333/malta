@@ -4,6 +4,7 @@ import { Download, Pencil, Search } from "lucide-react";
 import { api, date } from "./model";
 import { Dialog, Empty } from "./components";
 import example from "./issue-example.json";
+import { WorkflowIssueHistory } from "./WorkflowIssues";
 
 type IssueInput = typeof example & {
   version_id?: string;
@@ -372,6 +373,7 @@ export function Issues({
             <dt>变更说明</dt>
             <dd className="case-description">{selected.change_note || "—"}</dd>
           </dl>
+          <WorkflowIssueHistory issueID={selected.issue_id} />
           <details>
             <summary>技术信息 / 原始 JSON</summary>
             <pre className="issue-json">{pretty(selected)}</pre>

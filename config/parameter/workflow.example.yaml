@@ -1,0 +1,15 @@
+# Copy to workflow.yaml (ignored by Git). Set real values only in that copy.
+# This is an allowlist of UCE routes controlled by the Malta administrator.
+connections:
+  - id: sample-dev-uce
+    url: https://uce.example.invalid
+    token_file: /var/run/secrets/malta-uce/token
+    cluster: sample-dev
+    namespace: malta-workflows
+    subtypes: [malta]
+    # Same NAS directory visible to UCE stage Pods and the Malta Server.
+    remote_results_root: /mnt/uce/uce-runtime
+    local_results_root: /results/uce-runtime
+    max_bytes: 274877906944 # 256 GiB of unique dataset content
+    timeout_seconds: 3600
+    artifact_bytes: 33554432 # manifests + raw reports, not the benchmark dataset

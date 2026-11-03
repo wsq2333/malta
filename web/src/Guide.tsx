@@ -9,6 +9,7 @@ import {
   GitCompareArrows,
   Play,
 } from "lucide-react";
+import { AgentPromptTemplate } from "./AgentPromptTemplate";
 import examples from "./guide-examples.json";
 import issueExample from "./issue-example.json";
 
@@ -154,6 +155,7 @@ export function Guide({
     ["compare", "对比结果"],
     ["issues", "问题跟踪"],
     ["faq", "常见问题"],
+    ["agent-prompt", "Agent 提示词模板"],
   ];
   return (
     <div className="guide">
@@ -412,12 +414,13 @@ export function Guide({
           text={String.raw`malta --server ${origin} case list
 malta --server ${origin} run start \
   --case CASE_ID --case-revision 1 \
-  --request-id read-v1-20261027-001 --source agent
+  --request-id read-v1-20261027-001 --source agent --executor kubernetes
 malta --server ${origin} run wait RUN_ID --timeout 2m`}
         />
         <p>
-          将 CASE_ID、RUN_ID 替换为实际返回值。服务启用了认证时，通过{" "}
-          <code>MALTA_TOKEN</code> 提供 Token；远程 CLI 将 --server
+          将 CASE_ID、RUN_ID 替换为实际返回值；执行器按 capabilities 选择
+          kubernetes 或 local。服务启用了认证时，通过 <code>MALTA_TOKEN</code>{" "}
+          提供 Token；远程 CLI 将 --server
           改为可访问的服务地址。等待超时不会自动取消运行，可以继续查询或显式取消。
         </p>
         <button className="secondary" onClick={() => onNavigate("runs")}>
@@ -545,6 +548,7 @@ malta --server ${origin} run wait RUN_ID --timeout 2m`}
           </details>
         ))}
       </section>
+      <AgentPromptTemplate />
     </div>
   );
 }
