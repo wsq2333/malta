@@ -99,3 +99,6 @@ kubeconfig.yml
 !/docs/examples/workflow/oss-fuse-fio.argo-parameters.example.json
 /tools/malta-test-tools/**/__pycache__/
 /tools/malta-test-tools/**/*.pyc
+
+# Local validation reports and execution records are not published.
+/docs/validation/
