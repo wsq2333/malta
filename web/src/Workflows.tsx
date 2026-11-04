@@ -1,9 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { api, date } from "./model";
+import { api, date, format, metricLabel, operationLabel } from "./model";
 import { Dialog, Empty } from "./components";
 import example from "./workflow-example.json";
 import "./workflow.css";
 import { WorkflowIssues } from "./WorkflowIssues";
+import { CaseList } from "./CaseList";
+import { BackToList } from "./RecordViews";
+import {
+  workflowSummary,
+  verifiedPerformanceResults,
+} from "./workflowPresentation";
 
 type Connection = {
   id: string;
@@ -54,6 +60,7 @@ const nativeCase = (backend: string) => ({
 
 type Ref = { id: string; revision: number };
 type RecordValue = {
+  last_run_at?: string;
   id: string;
   revision: number;
   name: string;
@@ -105,7 +112,7 @@ type WorkflowRun = {
     state: string;
     verdict: string;
     error?: string;
-    metrics: { name: string; value: number; unit: string }[];
+    metrics: { operation: string; name: string; value: number; unit: string }[];
     assertions: Record<string, boolean>;
     files: { path: string; sha256: string; size: number }[];
   }[];
@@ -202,6 +209,9 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]),
     [offset, setOffset] = useState(0),
     [run, setRun] = useState<WorkflowRun | null>(null),
+    [runDetails, setRunDetails] = useState(
+      new URLSearchParams(location.search).get("workflow_view") === "details",
+    ),
     [baseline, setBaseline] = useState(""),
     [comparison, setComparison] = useState<Comparison | null>(null);
   useEffect(() => {
@@ -261,6 +271,23 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
       clearInterval(t);
     };
   }, [run?.id]);
+  function runRoute(id: string | null, details = false) {
+    const url = new URL(location.href);
+    if (id) url.searchParams.set("workflow_run", id);
+    else url.searchParams.delete("workflow_run");
+    if (details) url.searchParams.set("workflow_view", "details");
+    else url.searchParams.delete("workflow_view");
+    window.history.replaceState(null, "", url);
+    setRunDetails(details);
+  }
+  function openRun(value: WorkflowRun) {
+    setRun(value);
+    runRoute(value.id);
+  }
+  function closeRun() {
+    setRun(null);
+    runRoute(null);
+  }
   async function detail(r: RecordValue) {
     setSelected(r);
     try {
@@ -279,6 +306,25 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
       setError((e as Error).message);
     }
   }
+  if (run && runDetails)
+    return (
+      <section className="wf-workspace wf-run-page">
+        <BackToList label="返回测试结果" onClick={() => runRoute(run.id)} />
+        <header className="wf-heading">
+          <div>
+            <span className="eyebrow">TEST DETAILS</span>
+            <h2>{run.snapshot.case.name}</h2>
+            <p>执行过程、核验证据与原始记录</p>
+          </div>
+        </header>
+        {error && (
+          <div className="alert error" role="alert">
+            {error}
+          </div>
+        )}
+        <WorkflowRunDetails run={run} onAction={action} onError={setError} />
+      </section>
+    );
   return (
     <section className="wf-workspace">
       <div className="wf-heading">
@@ -286,16 +332,16 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           <span className="eyebrow">NATIVE WORKFLOWS</span>
           <h2>
             {mode === "cases"
-              ? "可复用的工作流用例"
+              ? "工作流用例"
               : mode === "runs"
                 ? "工作流测试"
                 : "执行环境管理"}
           </h2>
           <p>
             {mode === "cases"
-              ? "原生 Argo 模板随版本保存，结果解析可选。"
+              ? "选择用例查看版本，或直接发起测试。"
               : mode === "runs"
-                ? "分别查看执行状态、证据完整性和验证结论。"
+                ? "查看测试结果，打开详情追踪执行过程。"
                 : "引用已登记的硬件与软件版本；连接凭据由服务端管理。"}
           </p>
         </div>
@@ -311,7 +357,7 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
               : "新建配置"}
         </button>
       </div>
-      {(mode === "runs" || mode === "settings") && (
+      {mode === "settings" && (
         <div className="wf-connection-status" role="status">
           {connections.length === 0 ? (
             <p>
@@ -359,7 +405,33 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           {error}
         </div>
       )}
-      {mode !== "runs" && !selected && (
+      {mode === "cases" &&
+        !selected &&
+        (records.length ? (
+          <CaseList
+            items={records.map((r) => ({
+              id: r.id,
+              name: r.name,
+              lastRunAt: r.last_run_at,
+              onOpen: () => detail(r),
+              actions: (
+                <button
+                  className="primary"
+                  onClick={() => setWizard(r)}
+                  aria-label={`发起 ${r.name}`}
+                >
+                  发起测试
+                </button>
+              ),
+            }))}
+          />
+        ) : (
+          <Empty
+            title="还没有工作流用例"
+            text="保存模板，创建第一个可复用的测试。"
+          />
+        ))}
+      {mode === "settings" && !selected && (
         <div className="wf-grid">
           {records.map((r) => (
             <article className="wf-card" key={r.id}>
@@ -478,12 +550,9 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
             <table className="wf-table">
               <thead>
                 <tr>
-                  <th>测试 / 环境</th>
-                  <th>后端 / 入口</th>
-                  <th>时间</th>
-                  <th>执行</th>
-                  <th>证据</th>
-                  <th>验证</th>
+                  <th>测试名称</th>
+                  <th>测试时间</th>
+                  <th>结果</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -491,27 +560,24 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
                 {runs.map((r) => (
                   <tr key={r.id}>
                     <td>
-                      <strong>{r.snapshot.case.name}</strong>
-                      <small>
-                        {r.snapshot.system.name} · {r.snapshot.version.label}
-                      </small>
-                    </td>
-                    <td>
-                      {r.snapshot.profile.body.backend?.toUpperCase()}
-                      <small>{r.snapshot.profile.body.connection}</small>
+                      <button
+                        className="case-name-link"
+                        onClick={() => openRun(r)}
+                      >
+                        {r.snapshot.case.name}
+                      </button>
                     </td>
                     <td>{date(r.created_at)}</td>
                     <td>
-                      {label(
-                        r.execution_state === "not_submitted"
-                          ? r.status
-                          : r.execution_state || r.status,
-                      )}
+                      <span
+                        className="wf-result-badge"
+                        data-tone={workflowSummary(r).tone}
+                      >
+                        {workflowSummary(r).label}
+                      </span>
                     </td>
-                    <td>{label(r.result_state)}</td>
-                    <td>{label(r.verdict)}</td>
                     <td>
-                      <button onClick={() => setRun(r)}>详情</button>
+                      <button onClick={() => openRun(r)}>查看结果</button>
                       {r.verdict === "passed" &&
                         r.result_state === "complete" && (
                           <button
@@ -595,101 +661,64 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
           onClose={() => setWizard(undefined)}
           onStarted={(r) => {
             setWizard(undefined);
-            setRun(r);
+            openRun(r);
             setTick((x) => x + 1);
           }}
         />
       )}
       {run && (
-        <Dialog title={run.snapshot.case.name} onClose={() => setRun(null)}>
-          <div className="wf-detail">
-            <p>
-              {run.snapshot.system.name} · {run.snapshot.version.label} ·{" "}
-              {run.snapshot.profile.body.backend?.toUpperCase()} /{" "}
-              {run.snapshot.profile.body.connection}
-            </p>
-            {run.result_state === "not_configured" && (
-              <p className="wf-notice">
-                此运行未配置结果解析，只记录执行状态；“执行成功”不等于测试通过。
-              </p>
+        <Dialog title={run.snapshot.case.name} onClose={closeRun}>
+          <div className="wf-run-summary">
+            {error && (
+              <div className="alert error" role="alert">
+                {error}
+              </div>
             )}
-            <div className="wf-facts">
-              <span>
-                执行：
-                {label(
-                  run.execution_state === "not_submitted"
-                    ? run.status
-                    : run.execution_state || run.status,
-                )}
+            <div
+              className="wf-outcome"
+              data-tone={workflowSummary(run).tone}
+              role="status"
+            >
+              <span className="wf-outcome-mark" aria-hidden="true">
+                {workflowSummary(run).tone === "success"
+                  ? "✓"
+                  : workflowSummary(run).tone === "failure"
+                    ? "!"
+                    : "·"}
               </span>
-              <span>证据：{label(run.result_state)}</span>
-              <span>验证：{label(run.verdict)}</span>
+              <div>
+                <h3>{workflowSummary(run).label}</h3>
+                <p>{workflowSummary(run).description}</p>
+              </div>
             </div>
-            <ol className="wf-progress">
-              {run.steps.map((s) => (
-                <li key={s.name} data-state={s.state}>
-                  <strong>{s.name}</strong>
-                  <span>{label(s.state)}</span>
-                  <small>{s.detail}</small>
-                </li>
-              ))}
-            </ol>
-            {run.error && <div className="alert error">{run.error}</div>}
-            <DAG template={run.snapshot.ep} />
-            <WorkflowIssues key={run.id} run={run} />
-            {run.results.map((r, i) => (
-              <article className="wf-card" key={i}>
-                <h4>
-                  {r.node_id} · {r.parser}
-                </h4>
-                <p>
-                  {label(r.state)} / {label(r.verdict)} · attempt {r.attempt}
-                </p>
-                {r.error && <p className="alert error">{r.error}</p>}
-                <ul>
-                  {r.metrics.map((m) => (
-                    <li key={m.name}>
-                      {m.name}：{m.value} {m.unit}
-                    </li>
-                  ))}
-                </ul>
-                <dl>
-                  {Object.entries(r.assertions || {}).map(([k, v]) => (
-                    <div key={k}>
-                      {k}：{v ? "通过" : "失败"}
-                    </div>
-                  ))}
-                </dl>
-                {r.files.map((f) => (
-                  <button
-                    key={f.path}
-                    onClick={() =>
-                      downloadArtifact(run.id, f.path).catch((e) =>
-                        setError(e.message),
-                      )
-                    }
-                  >
-                    {f.path.slice(-45)} · {f.size} B
-                  </button>
-                ))}
-              </article>
-            ))}
-            <details>
-              <summary>运行身份、快照与原始状态</summary>
-              <pre>{pretty(run)}</pre>
-            </details>
-            <div className="wf-actions">
-              <button onClick={() => download(`${run.id}.json`, run)}>
-                导出运行记录
+            <WorkflowPerformance run={run} onError={setError} />
+            <dl className="wf-summary-facts">
+              <div>
+                <dt>测试时间</dt>
+                <dd>{date(run.created_at)}</dd>
+              </div>
+              <div>
+                <dt>被测系统</dt>
+                <dd>{run.snapshot.system.name}</dd>
+              </div>
+              <div>
+                <dt>软件版本</dt>
+                <dd>{run.snapshot.version.label}</dd>
+              </div>
+            </dl>
+            <div className="wf-summary-actions">
+              <button className="secondary" onClick={closeRun}>
+                关闭
               </button>
               {!["succeeded", "failed", "cancelled"].includes(run.status) && (
-                <button onClick={() => action("cancel")}>取消并等待确认</button>
+                <button onClick={() => action("cancel")}>取消测试</button>
               )}
-              {run.result_state === "missing" && (
-                <button onClick={() => action("collect")}>
-                  仅重试证据回收
-                </button>
-              )}
+              <button
+                className="primary"
+                onClick={() => runRoute(run.id, true)}
+              >
+                详情
+              </button>
             </div>
           </div>
         </Dialog>
@@ -697,6 +726,182 @@ export function Workflows({ mode }: { mode: "cases" | "runs" | "settings" }) {
     </section>
   );
 }
+
+function WorkflowPerformance({
+  run,
+  onError,
+}: {
+  run: WorkflowRun;
+  onError: (message: string) => void;
+}) {
+  const results = verifiedPerformanceResults(run);
+  const rules =
+    run.snapshot.case.body.implementations?.argo?.results ??
+    run.snapshot.case.body.results ??
+    [];
+  const hasPerformance =
+    run.results.some((r) => r.parser === "fio-3.33") ||
+    (Array.isArray(rules) && rules.some((r) => r.parser === "fio-3.33"));
+  if (!hasPerformance) return null;
+  return (
+    <section className="wf-performance" aria-label="性能结果">
+      <h4>性能结果</h4>
+      {results.length ? (
+        results.map((result) => (
+          <div key={result.node_id} className="wf-measurement">
+            <div className="wf-measurement-heading">
+              <span>{result.node_id}</span>
+              {result.files
+                .filter(
+                  (f) => f.path.endsWith("-fio.json") || f.path === "fio.json",
+                )
+                .map((f) => (
+                  <button
+                    key={f.path}
+                    onClick={() =>
+                      downloadArtifact(run.id, f.path).catch((e) =>
+                        onError(e.message),
+                      )
+                    }
+                  >
+                    下载 fio 报告
+                  </button>
+                ))}
+            </div>
+            <dl className="wf-metrics">
+              {result.metrics.map((m) => (
+                <div key={`${m.operation}/${m.name}/${m.unit}`}>
+                  <dt>
+                    {operationLabel[m.operation] || m.operation} ·{" "}
+                    {m.name === "clat_p99"
+                      ? "P99 完成延迟"
+                      : metricLabel[m.name] || m.name}
+                  </dt>
+                  <dd>
+                    {m.unit === "ns" && m.value >= 1e6
+                      ? `${(m.value / 1e6).toLocaleString("zh-CN", { maximumFractionDigits: 2 })} ms`
+                      : format(m.value, m.unit)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))
+      ) : (
+        <p className="muted">
+          {run.result_state === "not_configured"
+            ? "此用例未配置性能结果解析，原始产物可在详情中查看。"
+            : "暂无通过核验的性能结果。执行过程和核验原因请查看详情。"}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function WorkflowRunDetails({
+  run,
+  onAction,
+  onError,
+}: {
+  run: WorkflowRun;
+  onAction: (verb: string) => void;
+  onError: (message: string) => void;
+}) {
+  return (
+    <div className="wf-detail">
+      <p>
+        {run.snapshot.system.name} · {run.snapshot.version.label} ·{" "}
+        {run.snapshot.profile.body.backend?.toUpperCase()} /{" "}
+        {run.snapshot.profile.body.connection}
+      </p>
+      {run.result_state === "not_configured" && (
+        <p className="wf-notice">
+          此运行未配置结果解析，只记录执行状态；“执行成功”不等于测试通过。
+        </p>
+      )}
+      <div className="wf-facts">
+        <span>
+          执行：
+          {label(
+            run.execution_state === "not_submitted"
+              ? run.status
+              : run.execution_state || run.status,
+          )}
+        </span>
+        <span>证据：{label(run.result_state)}</span>
+        <span>验证：{label(run.verdict)}</span>
+      </div>
+      <ol className="wf-progress">
+        {run.steps.map((s) => (
+          <li key={s.name} data-state={s.state}>
+            <strong>{s.name}</strong>
+            <span>{label(s.state)}</span>
+            <small>{s.detail}</small>
+          </li>
+        ))}
+      </ol>
+      {run.error && <div className="alert error">{run.error}</div>}
+      <DAG template={run.snapshot.ep} />
+      <WorkflowIssues key={run.id} run={run} />
+      {run.results.map((r, i) => (
+        <article className="wf-card" key={i}>
+          <h4>
+            {r.node_id} · {r.parser}
+          </h4>
+          <p>
+            {label(r.state)} / {label(r.verdict)} · attempt {r.attempt}
+          </p>
+          {r.error && <p className="alert error">{r.error}</p>}
+          <ul>
+            {r.metrics.map((m) => (
+              <li key={`${m.operation}/${m.name}/${m.unit}`}>
+                {operationLabel[m.operation] || m.operation} ·{" "}
+                {metricLabel[m.name] || m.name}：{format(m.value, m.unit)}
+              </li>
+            ))}
+          </ul>
+          <dl>
+            {Object.entries(r.assertions || {}).map(([k, v]) => (
+              <div key={k}>
+                {k}：{v ? "通过" : "失败"}
+              </div>
+            ))}
+          </dl>
+          {r.files.map((f) => (
+            <button
+              key={f.path}
+              onClick={() =>
+                downloadArtifact(run.id, f.path).catch((e) =>
+                  onError(e.message),
+                )
+              }
+            >
+              {f.path.slice(-45)} · {f.size} B
+            </button>
+          ))}
+        </article>
+      ))}
+      <details>
+        <summary>运行身份、快照与原始状态</summary>
+        <pre>{pretty(run)}</pre>
+      </details>
+      <div className="wf-actions">
+        <button onClick={() => download(`${run.id}.json`, run)}>
+          导出运行记录
+        </button>
+        {!["succeeded", "failed", "cancelled"].includes(run.status) && (
+          <button onClick={() => onAction("cancel")}>取消并等待确认</button>
+        )}
+        {["missing", "invalid"].includes(run.result_state) && (
+          <button onClick={() => onAction("collect")}>
+            重新回收并核验证据
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 async function downloadArtifact(id: string, name: string) {
   const token = sessionStorage.getItem("malta-token") || "";
   const r = await fetch(

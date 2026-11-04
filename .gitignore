@@ -93,3 +93,9 @@ kubeconfig.yml
 !/deploy/kubernetes/overlays/workflow/
 !/deploy/kubernetes/overlays/workflow/README.md
 !/deploy/kubernetes/overlays/workflow/endpoints.example.yaml
+
+!/docs/examples/workflow/oss-fuse-fio.argo.example.json
+!/docs/examples/workflow/oss-fuse-fio.argo-case.example.json
+!/docs/examples/workflow/oss-fuse-fio.argo-parameters.example.json
+/tools/malta-test-tools/**/__pycache__/
+/tools/malta-test-tools/**/*.pyc

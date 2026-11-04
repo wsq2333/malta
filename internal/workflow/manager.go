@@ -264,8 +264,8 @@ func (m *Manager) RetryCollection(id string) (Run, error) {
 	if e != nil {
 		return r, e
 	}
-	if r.ExternalRunID == "" || r.ResultState != "missing" {
-		return r, domain.E("invalid", "only missing evidence can be recollected")
+	if r.ExternalRunID == "" || (r.ResultState != "missing" && r.ResultState != "invalid") {
+		return r, domain.E("invalid", "only missing or invalid evidence can be recollected")
 	}
 	deadline := time.Now().UTC().Add(2 * time.Minute)
 	r.CollectionDeadline = &deadline

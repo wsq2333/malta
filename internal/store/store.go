@@ -31,7 +31,7 @@ func Open(dir string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{DB: db, Dir: dir}
-	_, e = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS objects(kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE,body TEXT NOT NULL,digest TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL); `)
+	_, e = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS objects(kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE,body TEXT NOT NULL,digest TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS runs_by_case_time ON runs(json_extract(body,'$.case_ref.id'),julianday(created_at) DESC,id DESC); `)
 	if e != nil {
 		db.Close()
 		return nil, e

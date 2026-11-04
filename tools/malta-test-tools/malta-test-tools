@@ -1,0 +1,4 @@
+#!/bin/sh
+export PYTHONPATH=/opt/malta-test-tools/deps
+export PYTHONDONTWRITEBYTECODE=1
+exec /usr/bin/python3 /opt/malta-test-tools/tasks.py "$@"

@@ -7,3 +7,10 @@ build/*
 !LICENSE
 !NOTICE
 !THIRD_PARTY_NOTICES.md
+
+!tools/
+tools/*
+!tools/malta-test-tools/
+tools/malta-test-tools/*
+!tools/malta-test-tools/tasks.py
+!tools/malta-test-tools/malta-test-tools

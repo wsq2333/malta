@@ -134,7 +134,7 @@ func (s *Store) CaseVersion(id string, revision int) (domain.CaseVersion, error)
 	return out, e
 }
 func (s *Store) Cases() ([]domain.Case, error) {
-	rows, e := s.DB.Query("SELECT c.id,c.created_at,v.body FROM test_cases c JOIN case_versions v ON v.case_id=c.id AND v.revision=c.latest_revision ORDER BY json_extract(v.body,'$.created_at') DESC,c.id")
+	rows, e := s.DB.Query("SELECT c.id,c.created_at,v.body,COALESCE((SELECT created_at FROM runs WHERE json_extract(body,'$.case_ref.id')=c.id ORDER BY julianday(created_at) DESC,id DESC LIMIT 1),'') FROM test_cases c JOIN case_versions v ON v.case_id=c.id AND v.revision=c.latest_revision ORDER BY json_extract(v.body,'$.created_at') DESC,c.id")
 	if e != nil {
 		return nil, e
 	}
@@ -143,7 +143,7 @@ func (s *Store) Cases() ([]domain.Case, error) {
 	for rows.Next() {
 		var c domain.Case
 		var created, body string
-		if e = rows.Scan(&c.ID, &created, &body); e != nil {
+		if e = rows.Scan(&c.ID, &created, &body, &c.LastRunAt); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(body), &c.Latest); e != nil {

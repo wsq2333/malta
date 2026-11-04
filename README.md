@@ -4,7 +4,7 @@
 
 Malta is an agent-enhanced platform for orchestrating, managing, and comparing distributed file system benchmarks. It combines a scriptable CLI, reproducible data and metadata baselines, and a visual workspace to compare performance across versions, dates, and hardware environments.
 
-Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共用一套 CLI、测试定义和结果契约，完成“保存用例 → 执行测试 → 固定基线 → 对比版本 → 追踪问题”。前端以简洁卡片呈现摘要，通过独立详情查看配置和证据；Agent 通过 CLI/API 操作相同的数据。名称取自地中海岛国马耳他。
+Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共用一套 CLI、测试定义和结果契约，完成“保存用例 → 执行测试 → 固定基线 → 对比版本 → 追踪问题”。前端以简洁列表与卡片呈现摘要，通过独立详情查看配置和证据；Agent 通过 CLI/API 操作相同的数据。名称取自地中海岛国马耳他。
 
 > **当前范围：S0–S7 代码已实现，进入 v0.1 RC 验证。** 本地与 Kubernetes Job 执行、CLI/API、结果存储、基线比较及 React UI 已接通。服务 Pod 与测试 Pod 独立，通过结果 PVC 回传证据。Agent 能力发现、会话恢复和 skill 已补齐；提供可复现构建、安装升级文档与 Apache-2.0 许可证。生产 CSI、固定实验室性能与外部模型行为仍需专项验收。
 
@@ -29,6 +29,37 @@ Malta（马耳他）以可重复的测量为基础，让工程师与 Agent 共�
 
 Agent 发起测试可使用[提示词填空模板](docs/agent-benchmark-prompt.md)，UI 入口为「使用指南 → Agent 提示词模板」，支持编辑、复制和下载。
 
+## 工作流测试用例
+
+工作流用例保存完整 Argo 模板、参数 Schema 和可选结果解析规则，每次编辑生成新版本。下面的例子将数据准备、预热和性能测量串成一个 DAG；文件大小、数量和 fio 参数在提交时填写，无需为每组负载重新编写模板。
+
+### OSS 上传 → FUSE 全读预热 → fio 顺序读
+
+| 阶段 | 行为 | 输出与核验 |
+| --- | --- | --- |
+| `upload` | 向本次运行的独立 OSS 前缀上传可复现数据，禁止覆盖其他运行的对象 | `dataset.json`：文件名、大小、SHA256；校验对象大小和摘要元数据 |
+| `warmup` | 通过只读 FUSE 挂载完整读取同一批文件 | `warmup.json`、预热 fio 报告；检查文件数量、大小和完整读取字节数 |
+| `fio-read` | 对已有文件集执行 fio 3.33 顺序读，不创建或覆盖文件 | `fio.json`、实际配置与证据清单；Malta 校验身份、摘要和参数后提取吞吐、IOPS、P99 完成延迟 |
+
+公开示例：
+
+- [完整 Malta 工作流用例](docs/examples/workflow/oss-fuse-fio.argo-case.example.json)：用于“用例管理 → 工作流用例”导入。
+- [原生 Argo WorkflowTemplate](docs/examples/workflow/oss-fuse-fio.argo.example.json)：用于查看或独立适配 DAG。
+- [可填写的测试参数](docs/examples/workflow/oss-fuse-fio.argo-parameters.example.json)：默认 **256 × 4 MiB = 1 GiB**，上传并发 4；fio 使用 1 MiB I/O 块、1 个 job、深度 1、`psync`、`direct=0`，读取 60 秒。
+
+文件大小与 I/O 块大小是两个参数；增加 `fio_numjobs` 时，每个 job 读取同一文件集，不增加准备数据量，也不代表文件被分成互不重叠的分区。
+
+使用步骤：
+
+1. 按[测试工具镜像说明](tools/malta-test-tools/README.md)构建镜像。把示例复制到被 Git 忽略的 `config/workflow/`，绑定真实镜像 digest、namespace、客户端节点、ServiceAccount 和 Secret 引用。账号密码与 AK/SK 不写入模板正文。
+2. 准备只读测试卷 `/bench` 和共享结果卷 `/results`；确认挂载映射、CSI、权限、客户端资源以及 Malta 的结果目录配置。示例中的 `replace-*` 是占位符，不能直接运行。
+3. 在“用例管理 → 工作流用例”导入配置后的完整用例，在“环境与版本”登记被测系统和执行配置。按 **用例版本 → 被测系统 → 执行配置 → 软件版本 → 参数 → 预检查 → 提交** 发起测试。
+4. 在“测试中心 → 工作流测试 → 查看结果”查看最终结论与已核验性能指标、下载 fio 报告；进入“详情”查看阶段状态、断言、证据和原始记录。缺失或无效证据可重新回收核验，不重新提交 DAG。
+
+该例子的预热是 **FUSE 完整读取**，不是文件系统显式预加载接口，也不证明测量全部命中缓存。上传的 SHA256 清单与 HEAD 元数据校验不等同于读取后重新计算文件 SHA256；内容正确性、缓存块大小和副本数需另行验证。测试保留对象和缓存，不自动清理。数据量与总时限仍受 Malta 连接配置和用户授权约束。
+
+只需要自动化验证时，也可使用[最简原生 Argo 模板](docs/examples/workflow/native-argo.example.json)或[带结果解析的用例](docs/examples/workflow/case.example.json)。未配置结果解析的“成功”仅表示工作流执行成功；完整契约、CLI 和问题关联见[工作流使用说明](docs/workflows.md)。
+
 ## 前端 UI 设计
 
 性能测试现支持硬件范围选择、测试项目/条件概览与分页运行历史。统计由服务端覆盖完整匹配记录；详见[性能概览与历史](docs/performance-catalog.md)。
@@ -37,15 +68,18 @@ Agent 发起测试可使用[提示词填空模板](docs/agent-benchmark-prompt.m
 
 [工作流测试使用说明](docs/workflows.md)包含页面操作、完整 Argo 模板示例、`serve --workflow-config` 配置、Agent CLI、结果契约与问题关联。公开版本仅保留 Argo Server REST 适配和通用后端扩展接口，原生 DAG 语义交由后端。支持 Secret 文件提供账号密码/客户端密钥并自动获取和刷新 Token；测试采用模拟后端，真实集群联调和部署另行进行。
 
-工作流示例提供 Argo 原生执行与 JUnit 证据回收。自定义性能 DAG 需自行提供工具镜像、参数与结果契约；参考[Agent 工作流提示词](docs/agent-workflow-benchmark-prompt.md)。
+工作流示例提供 Argo 原生执行与 JUnit 证据回收。[malta-test-tools](tools/malta-test-tools/README.md) 提供 OSS 上传、FUSE 全读和 fio 顺序读三阶段工具及参数化 Argo 模板；参考[Agent 工作流提示词](docs/agent-workflow-benchmark-prompt.md)。
 
 ```text
 用例管理 → 工作流用例 → 保存原生 Argo 模板、可选参数 Schema 与结果解析
 环境与版本 → 被测系统与执行配置 → 固定环境、软件、路由、客户端与卷
 测试中心 → 工作流测试 → 用例版本 → 被测系统 → 执行配置
   → 软件版本 → 参数 → 预检查 → 提交
-运行详情 → 执行状态 / 证据状态 / 验证结论 → 关联问题 / 修复验证
+查看结果 → 成功 / 失败与已核验性能指标
+  → 详情 → 阶段状态、证据下载、原始记录、关联问题 / 修复验证
 ```
+
+工作流测试的结果概览展示成功或失败，以及已核验的吞吐、IOPS 和 P99 延迟；运行中和已取消保留实际状态。执行阶段、产物状态和原始 JSON 放在独立的“详情”页。未配置结果解析的成功只表示执行成功，不表示测试验证通过。
 
 下面七项描述的是现有页面能力，软件版本属于“环境与版本”的页签，对比趋势从测试中心进入，不是额外一级侧栏。
 
@@ -57,7 +91,7 @@ Agent 发起测试可使用[提示词填空模板](docs/agent-benchmark-prompt.m
 | --- | --- | --- |
 | 性能基线 | **已设基线 / 全部测试**两个页签；卡片显示名称、软件版本、负载、云环境、状态、日期与主要指标 | 发起测试；查看负载和重复实验指标、已测并发曲线；取消任务、设为基线、下载证据、进入对比 |
 | 问题管理 | 标题、自定义类型、解决状态、软件与发现时间 | 查看问题描述、关联环境/运行、修改历史和解决方式；导入 JSON、编辑与跟进 |
-| 用例管理 | 名称、负载类型、修订号、简述与更新时间 | 查看可读负载参数、切换历史修订、编辑为新版本、导出 JSON、使用指定版本测试 |
+| 用例管理 | 性能计划、工作流用例均使用紧凑列表：测试名称、最近测试时间（未运行显示“尚未测试”） | 查看可读负载参数、切换历史修订、编辑为新版本、导出 JSON、使用指定版本测试 |
 | 软件版本 | 文件系统与版本名称 | 查看构建身份及该版本关联测试 |
 | 硬件环境 | **云类型 + 客户端/服务端数量 + 机器型号** | 硬件配置、测试配置、关联测试三个页签；选择执行快照，查看区域、挂载、UID/GID、资源额度与镜像等细节 |
 | 对比与趋势 | 两个测试摘要、可比性结论与关键指标变化 | 选择参照与候选测试，查看条件差异、完整指标及日期趋势 |

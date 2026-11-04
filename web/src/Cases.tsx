@@ -1,13 +1,9 @@
-import {
-  BackToList,
-  RecordCard,
-  WorkloadFacts,
-  TechnicalInfo,
-} from "./RecordViews";
+import { BackToList, WorkloadFacts, TechnicalInfo } from "./RecordViews";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BookOpen, Plus, Play, Pencil, Download, Search } from "lucide-react";
 import { api, date, type Plan, type Run } from "./model";
 import { Dialog, Empty } from "./components";
+import { CaseList } from "./CaseList";
 export interface CaseVersion {
   case_id: string;
   revision: number;
@@ -18,6 +14,7 @@ export interface CaseVersion {
   plan: Plan;
 }
 interface TestCase {
+  last_run_at?: string;
   id: string;
   created_at: string;
   updated_at: string;
@@ -289,26 +286,14 @@ export function Cases({
           {loading ? (
             <p className="case-padding muted">正在加载用例…</p>
           ) : visible.length ? (
-            <div className="record-grid">
-              {visible.map((c) => (
-                <RecordCard
-                  key={c.id}
-                  title={c.latest.name}
-                  subtitle={
-                    <>
-                      {kindLabel(c.latest.plan.spec.kind)} · 修订 v
-                      {c.latest.revision}
-                    </>
-                  }
-                  onOpen={() => setActiveID(c.id)}
-                >
-                  <p className="record-description">
-                    {c.latest.description || "暂无描述"}
-                  </p>
-                  <p className="muted">更新于 {date(c.updated_at)}</p>
-                </RecordCard>
-              ))}
-            </div>
+            <CaseList
+              items={visible.map((c) => ({
+                id: c.id,
+                name: c.latest.name,
+                lastRunAt: c.last_run_at,
+                onOpen: () => setActiveID(c.id),
+              }))}
+            />
           ) : (
             <Empty
               title={query ? "没有匹配的用例" : "建立你的第一个用例"}
