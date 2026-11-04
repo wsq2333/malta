@@ -11,8 +11,10 @@ import (
 	"github.com/wsq2333/malta/internal/engine/fio"
 	"io"
 	"io/fs"
+	"math/big"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -256,7 +258,7 @@ func (m *Manager) verify(r *Run, rule ResultRule, stage backend.Stage, remotePat
 			return result, domain.E("invalid", "one fio aggregate required")
 		}
 		for k, want := range rule.ExpectedOptions {
-			if v.Jobs[0].Options[k] != want {
+			if !fioOptionMatches(k, v.Jobs[0].Options[k], want) {
 				return result, domain.E("invalid", "fio actual option mismatch: "+k)
 			}
 		}
@@ -417,4 +419,26 @@ func Compare(a, b Run) (map[string]any, error) {
 		}
 	}
 	return map[string]any{"comparable": true, "metrics": deltas, "warning": "单次样本；差异不自动归因于软件版本"}, nil
+}
+
+// Previously saved snapshots may contain scientific notation from fmt.Sprint.
+// Compare integer-valued fio options exactly, without float rounding or unit
+// conversion. This preserves immutable snapshots while allowing recollection.
+var fioNumericOption = regexp.MustCompile(`^[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]{1,2})?$`)
+
+func fioOptionMatches(key, actual, expected string) bool {
+	if actual == expected {
+		return true
+	}
+	switch key {
+	case "bs", "numjobs", "iodepth", "direct", "runtime", "allow_file_create", "time_based":
+		if len(actual) > 64 || len(expected) > 64 || !fioNumericOption.MatchString(actual) || !fioNumericOption.MatchString(expected) {
+			return false
+		}
+		a, aok := new(big.Rat).SetString(actual)
+		b, bok := new(big.Rat).SetString(expected)
+		return aok && bok && a.IsInt() && b.IsInt() && a.Cmp(b) == 0
+	default:
+		return false
+	}
 }

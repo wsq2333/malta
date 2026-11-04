@@ -15,7 +15,8 @@ func migrate(s *store.Store) error {
  CREATE TABLE IF NOT EXISTS workflow_preflights(id TEXT PRIMARY KEY,body TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS workflow_issue_links(run_id TEXT NOT NULL,issue_id TEXT NOT NULL,role TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(run_id,issue_id,role));
  CREATE INDEX IF NOT EXISTS workflow_issue_by_issue ON workflow_issue_links(issue_id);
- CREATE TABLE IF NOT EXISTS workflow_runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,body TEXT NOT NULL,updated_at TEXT NOT NULL);`)
+ CREATE TABLE IF NOT EXISTS workflow_runs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,body TEXT NOT NULL,updated_at TEXT NOT NULL);
+ CREATE INDEX IF NOT EXISTS workflow_runs_by_case_time ON workflow_runs(json_extract(body,'$.snapshot.case.id'),julianday(json_extract(body,'$.created_at')) DESC,id DESC);`)
 	return e
 }
 func validKind(k string) bool { return k == "cases" || k == "systems" || k == "profiles" }
@@ -95,11 +96,18 @@ func (m *Manager) Record(kind string, ref Ref) (Record, error) {
 	e = json.Unmarshal([]byte(raw), &r)
 	return r, e
 }
-func (m *Manager) Records(kind, id string) ([]Record, error) {
+
+// RecordSummary carries live activity only in listing responses, never immutable snapshots.
+type RecordSummary struct {
+	Record
+	LastRunAt string `json:"last_run_at,omitempty"`
+}
+
+func (m *Manager) Records(kind, id string) ([]RecordSummary, error) {
 	if !validKind(kind) {
 		return nil, domain.E("invalid", "unknown record kind")
 	}
-	query := "SELECT body FROM workflow_records r WHERE kind=?"
+	query := "SELECT r.body,COALESCE((SELECT json_extract(w.body,'$.created_at') FROM workflow_runs w WHERE r.kind='cases' AND json_extract(w.body,'$.snapshot.case.id')=r.id ORDER BY julianday(json_extract(w.body,'$.created_at')) DESC,w.id DESC LIMIT 1),'') FROM workflow_records r WHERE kind=?"
 	args := []any{kind}
 	if id != "" {
 		query += " AND id=?"
@@ -113,11 +121,11 @@ func (m *Manager) Records(kind, id string) ([]Record, error) {
 		return nil, e
 	}
 	defer rows.Close()
-	out := []Record{}
+	out := []RecordSummary{}
 	for rows.Next() {
 		var raw string
-		var r Record
-		if e = rows.Scan(&raw); e != nil {
+		var r RecordSummary
+		if e = rows.Scan(&raw, &r.LastRunAt); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(raw), &r); e != nil {

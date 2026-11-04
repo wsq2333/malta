@@ -1,0 +1,13 @@
+ARG BASE_IMAGE=debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+FROM ${BASE_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends fio=3.33-3 python3 ca-certificates && test "$(fio --version)" = fio-3.33 && rm -rf /var/lib/apt/lists/*
+COPY build/output/malta-test-tools/deps /opt/malta-test-tools/deps
+COPY build/output/malta-test-tools/requirements.lock build/output/malta-test-tools/dependencies.json /opt/malta-test-tools/
+COPY tools/malta-test-tools/tasks.py /opt/malta-test-tools/tasks.py
+COPY --chmod=755 tools/malta-test-tools/malta-test-tools /usr/local/bin/malta-test-tools
+COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /usr/share/doc/malta-test-tools/
+ENV PYTHONPATH=/opt/malta-test-tools/deps PYTHONDONTWRITEBYTECODE=1
+USER 10001:10001
+RUN /usr/local/bin/malta-test-tools version
+ENTRYPOINT ["/usr/local/bin/malta-test-tools"]
+CMD ["version"]

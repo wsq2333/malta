@@ -316,7 +316,7 @@ func (m *Manager) compile(q Selection) (Snapshot, error) {
 			if !ok {
 				return s, domain.E("invalid", "missing fio option parameter")
 			}
-			r.ExpectedOptions[option] = fmt.Sprint(v)
+			r.ExpectedOptions[option] = fioOptionValue(v)
 		}
 		s.Definition.Results[i] = r
 	}
@@ -327,3 +327,12 @@ func (m *Manager) compile(q Selection) (Snapshot, error) {
 func object(v any) map[string]any { m, _ := v.(map[string]any); return m }
 
 func hasJSON(v json.RawMessage) bool { return len(v) > 0 && strings.TrimSpace(string(v)) != "null" }
+
+// JSON numbers decode as float64. fio reports decimal option values, even when
+// fmt.Sprint would render the same number in scientific notation.
+func fioOptionValue(v any) string {
+	if n, ok := v.(float64); ok {
+		return strconv.FormatFloat(n, 'f', -1, 64)
+	}
+	return fmt.Sprint(v)
+}

@@ -27,3 +27,5 @@ Do not claim that apt-based images are byte-for-byte reproducible across dates.
 The Server includes UI and kubectl; Runner includes fio and the same Malta binary.
 Both run as UID/GID 10001 with Malta as PID 1 to receive SIGTERM. No model runtime,
 Kubernetes credentials, mounting privileges or workload data is baked into images.
+
+独立 Argo 三阶段工具镜像使用 `Dockerfile.test-tools`，见 [malta-test-tools](../../tools/malta-test-tools/README.md)。它不包含 Malta Server/Worker，不依赖服务端二进制版本匹配；通过工作流 evidence 协议回收结果。

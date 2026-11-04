@@ -17,6 +17,7 @@ type Case struct {
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
 	Latest    CaseVersion `json:"latest"`
+	LastRunAt string      `json:"last_run_at,omitempty"`
 }
 type SaveCase struct {
 	Name         string `json:"name"`

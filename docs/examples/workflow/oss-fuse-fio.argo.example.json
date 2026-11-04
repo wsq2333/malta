@@ -1,0 +1,618 @@
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "WorkflowTemplate",
+  "metadata": {
+    "name": "malta-oss-fuse-fio"
+  },
+  "spec": {
+    "entrypoint": "main",
+    "serviceAccountName": "replace-workflow-service-account",
+    "activeDeadlineSeconds": 1200,
+    "securityContext": {
+      "runAsNonRoot": true,
+      "runAsUser": 10001,
+      "runAsGroup": 10001,
+      "fsGroup": 10001,
+      "fsGroupChangePolicy": "OnRootMismatch",
+      "seccompProfile": {
+        "type": "RuntimeDefault"
+      }
+    },
+    "nodeSelector": {
+      "kubernetes.io/hostname": "replace-client-node"
+    },
+    "imagePullSecrets": [
+      {
+        "name": "replace-registry-secret"
+      }
+    ],
+    "arguments": {
+      "parameters": [
+        {
+          "name": "file_size_bytes",
+          "value": "4194304"
+        },
+        {
+          "name": "file_count",
+          "value": "256"
+        },
+        {
+          "name": "dataset_prefix",
+          "value": "malta-read-cache"
+        },
+        {
+          "name": "data_seed",
+          "value": "1"
+        },
+        {
+          "name": "upload_concurrency",
+          "value": "4"
+        },
+        {
+          "name": "warmup_timeout_seconds",
+          "value": "600"
+        },
+        {
+          "name": "fio_bs_bytes",
+          "value": "1048576"
+        },
+        {
+          "name": "fio_numjobs",
+          "value": "1"
+        },
+        {
+          "name": "fio_iodepth",
+          "value": "1"
+        },
+        {
+          "name": "fio_ioengine",
+          "value": "psync"
+        },
+        {
+          "name": "fio_direct",
+          "value": "0"
+        },
+        {
+          "name": "fio_runtime_seconds",
+          "value": "60"
+        },
+        {
+          "name": "malta_context"
+        }
+      ]
+    },
+    "volumes": [
+      {
+        "name": "results",
+        "persistentVolumeClaim": {
+          "claimName": "replace-shared-results-pvc"
+        }
+      },
+      {
+        "name": "benchmark",
+        "persistentVolumeClaim": {
+          "claimName": "replace-curvine-pvc",
+          "readOnly": true
+        }
+      },
+      {
+        "name": "scratch",
+        "emptyDir": {
+          "sizeLimit": "1Gi"
+        }
+      }
+    ],
+    "templates": [
+      {
+        "name": "main",
+        "dag": {
+          "tasks": [
+            {
+              "name": "upload",
+              "template": "upload"
+            },
+            {
+              "name": "warmup",
+              "template": "warmup",
+              "dependencies": [
+                "upload"
+              ],
+              "arguments": {
+                "parameters": [
+                  {
+                    "name": "input-path",
+                    "value": "{{tasks.upload.outputs.parameters.dataset}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "fio-read",
+              "template": "fio-read",
+              "dependencies": [
+                "warmup"
+              ],
+              "arguments": {
+                "parameters": [
+                  {
+                    "name": "input-path",
+                    "value": "{{tasks.warmup.outputs.parameters.warmup}}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "upload",
+        "outputs": {
+          "parameters": [
+            {
+              "name": "dataset",
+              "valueFrom": {
+                "path": "/tmp/malta-dataset-path"
+              }
+            },
+            {
+              "name": "evidence",
+              "valueFrom": {
+                "path": "/tmp/malta-evidence-path"
+              }
+            }
+          ]
+        },
+        "container": {
+          "image": "registry.example.invalid/malta-test-tools:replace",
+          "command": [
+            "/usr/local/bin/malta-test-tools"
+          ],
+          "args": [
+            "upload"
+          ],
+          "env": [
+            {
+              "name": "MALTA_PARAM_FILE_SIZE_BYTES",
+              "value": "{{workflow.parameters.file_size_bytes}}"
+            },
+            {
+              "name": "MALTA_PARAM_FILE_COUNT",
+              "value": "{{workflow.parameters.file_count}}"
+            },
+            {
+              "name": "MALTA_PARAM_DATASET_PREFIX",
+              "value": "{{workflow.parameters.dataset_prefix}}"
+            },
+            {
+              "name": "MALTA_PARAM_DATA_SEED",
+              "value": "{{workflow.parameters.data_seed}}"
+            },
+            {
+              "name": "MALTA_PARAM_UPLOAD_CONCURRENCY",
+              "value": "{{workflow.parameters.upload_concurrency}}"
+            },
+            {
+              "name": "MALTA_PARAM_WARMUP_TIMEOUT_SECONDS",
+              "value": "{{workflow.parameters.warmup_timeout_seconds}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_BS_BYTES",
+              "value": "{{workflow.parameters.fio_bs_bytes}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_NUMJOBS",
+              "value": "{{workflow.parameters.fio_numjobs}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_IODEPTH",
+              "value": "{{workflow.parameters.fio_iodepth}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_IOENGINE",
+              "value": "{{workflow.parameters.fio_ioengine}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_DIRECT",
+              "value": "{{workflow.parameters.fio_direct}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_RUNTIME_SECONDS",
+              "value": "{{workflow.parameters.fio_runtime_seconds}}"
+            },
+            {
+              "name": "MALTA_CONTEXT",
+              "value": "{{workflow.parameters.malta_context}}"
+            },
+            {
+              "name": "WORKFLOW_NAME",
+              "value": "{{workflow.name}}"
+            },
+            {
+              "name": "WORKFLOW_UID",
+              "value": "{{workflow.uid}}"
+            },
+            {
+              "name": "ARGO_NODE_ID",
+              "valueFrom": {
+                "fieldRef": {
+                  "fieldPath": "metadata.annotations['workflows.argoproj.io/node-id']"
+                }
+              }
+            },
+            {
+              "name": "RESULTS_ROOT",
+              "value": "/results"
+            },
+            {
+              "name": "BENCH_ROOT",
+              "value": "/bench"
+            },
+            {
+              "name": "OSS_ENDPOINT",
+              "value": "https://oss-region.example.invalid"
+            },
+            {
+              "name": "OSS_BUCKET",
+              "value": "replace-bucket"
+            },
+            {
+              "name": "OSS_ACCESS_KEY_ID",
+              "valueFrom": {
+                "secretKeyRef": {
+                  "name": "replace-oss-secret",
+                  "key": "OSS_ACCESS_KEY_ID",
+                  "optional": false
+                }
+              }
+            },
+            {
+              "name": "OSS_ACCESS_KEY_SECRET",
+              "valueFrom": {
+                "secretKeyRef": {
+                  "name": "replace-oss-secret",
+                  "key": "OSS_ACCESS_KEY_SECRET",
+                  "optional": false
+                }
+              }
+            },
+            {
+              "name": "OSS_SESSION_TOKEN",
+              "valueFrom": {
+                "secretKeyRef": {
+                  "name": "replace-oss-secret",
+                  "key": "OSS_SESSION_TOKEN",
+                  "optional": true
+                }
+              }
+            }
+          ],
+          "volumeMounts": [
+            {
+              "name": "results",
+              "mountPath": "/results"
+            },
+            {
+              "name": "scratch",
+              "mountPath": "/tmp"
+            }
+          ],
+          "resources": {
+            "requests": {
+              "cpu": "1",
+              "memory": "512Mi"
+            },
+            "limits": {
+              "cpu": "2",
+              "memory": "1Gi"
+            }
+          },
+          "securityContext": {
+            "allowPrivilegeEscalation": false,
+            "readOnlyRootFilesystem": true,
+            "capabilities": {
+              "drop": [
+                "ALL"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "warmup",
+        "inputs": {
+          "parameters": [
+            {
+              "name": "input-path"
+            }
+          ]
+        },
+        "outputs": {
+          "parameters": [
+            {
+              "name": "warmup",
+              "valueFrom": {
+                "path": "/tmp/malta-warmup-path"
+              }
+            },
+            {
+              "name": "evidence",
+              "valueFrom": {
+                "path": "/tmp/malta-evidence-path"
+              }
+            }
+          ]
+        },
+        "container": {
+          "image": "registry.example.invalid/malta-test-tools:replace",
+          "command": [
+            "/usr/local/bin/malta-test-tools"
+          ],
+          "args": [
+            "warmup"
+          ],
+          "env": [
+            {
+              "name": "MALTA_PARAM_FILE_SIZE_BYTES",
+              "value": "{{workflow.parameters.file_size_bytes}}"
+            },
+            {
+              "name": "MALTA_PARAM_FILE_COUNT",
+              "value": "{{workflow.parameters.file_count}}"
+            },
+            {
+              "name": "MALTA_PARAM_DATASET_PREFIX",
+              "value": "{{workflow.parameters.dataset_prefix}}"
+            },
+            {
+              "name": "MALTA_PARAM_DATA_SEED",
+              "value": "{{workflow.parameters.data_seed}}"
+            },
+            {
+              "name": "MALTA_PARAM_UPLOAD_CONCURRENCY",
+              "value": "{{workflow.parameters.upload_concurrency}}"
+            },
+            {
+              "name": "MALTA_PARAM_WARMUP_TIMEOUT_SECONDS",
+              "value": "{{workflow.parameters.warmup_timeout_seconds}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_BS_BYTES",
+              "value": "{{workflow.parameters.fio_bs_bytes}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_NUMJOBS",
+              "value": "{{workflow.parameters.fio_numjobs}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_IODEPTH",
+              "value": "{{workflow.parameters.fio_iodepth}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_IOENGINE",
+              "value": "{{workflow.parameters.fio_ioengine}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_DIRECT",
+              "value": "{{workflow.parameters.fio_direct}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_RUNTIME_SECONDS",
+              "value": "{{workflow.parameters.fio_runtime_seconds}}"
+            },
+            {
+              "name": "MALTA_CONTEXT",
+              "value": "{{workflow.parameters.malta_context}}"
+            },
+            {
+              "name": "WORKFLOW_NAME",
+              "value": "{{workflow.name}}"
+            },
+            {
+              "name": "WORKFLOW_UID",
+              "value": "{{workflow.uid}}"
+            },
+            {
+              "name": "ARGO_NODE_ID",
+              "valueFrom": {
+                "fieldRef": {
+                  "fieldPath": "metadata.annotations['workflows.argoproj.io/node-id']"
+                }
+              }
+            },
+            {
+              "name": "RESULTS_ROOT",
+              "value": "/results"
+            },
+            {
+              "name": "BENCH_ROOT",
+              "value": "/bench"
+            },
+            {
+              "name": "MALTA_INPUT_PATH",
+              "value": "{{inputs.parameters.input-path}}"
+            }
+          ],
+          "volumeMounts": [
+            {
+              "name": "results",
+              "mountPath": "/results"
+            },
+            {
+              "name": "scratch",
+              "mountPath": "/tmp"
+            },
+            {
+              "name": "benchmark",
+              "mountPath": "/bench",
+              "readOnly": true
+            }
+          ],
+          "resources": {
+            "requests": {
+              "cpu": "1",
+              "memory": "512Mi"
+            },
+            "limits": {
+              "cpu": "2",
+              "memory": "1Gi"
+            }
+          },
+          "securityContext": {
+            "allowPrivilegeEscalation": false,
+            "readOnlyRootFilesystem": true,
+            "capabilities": {
+              "drop": [
+                "ALL"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "fio-read",
+        "inputs": {
+          "parameters": [
+            {
+              "name": "input-path"
+            }
+          ]
+        },
+        "outputs": {
+          "parameters": [
+            {
+              "name": "evidence",
+              "valueFrom": {
+                "path": "/tmp/malta-evidence-path"
+              }
+            }
+          ]
+        },
+        "container": {
+          "image": "registry.example.invalid/malta-test-tools:replace",
+          "command": [
+            "/usr/local/bin/malta-test-tools"
+          ],
+          "args": [
+            "fio-read"
+          ],
+          "env": [
+            {
+              "name": "MALTA_PARAM_FILE_SIZE_BYTES",
+              "value": "{{workflow.parameters.file_size_bytes}}"
+            },
+            {
+              "name": "MALTA_PARAM_FILE_COUNT",
+              "value": "{{workflow.parameters.file_count}}"
+            },
+            {
+              "name": "MALTA_PARAM_DATASET_PREFIX",
+              "value": "{{workflow.parameters.dataset_prefix}}"
+            },
+            {
+              "name": "MALTA_PARAM_DATA_SEED",
+              "value": "{{workflow.parameters.data_seed}}"
+            },
+            {
+              "name": "MALTA_PARAM_UPLOAD_CONCURRENCY",
+              "value": "{{workflow.parameters.upload_concurrency}}"
+            },
+            {
+              "name": "MALTA_PARAM_WARMUP_TIMEOUT_SECONDS",
+              "value": "{{workflow.parameters.warmup_timeout_seconds}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_BS_BYTES",
+              "value": "{{workflow.parameters.fio_bs_bytes}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_NUMJOBS",
+              "value": "{{workflow.parameters.fio_numjobs}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_IODEPTH",
+              "value": "{{workflow.parameters.fio_iodepth}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_IOENGINE",
+              "value": "{{workflow.parameters.fio_ioengine}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_DIRECT",
+              "value": "{{workflow.parameters.fio_direct}}"
+            },
+            {
+              "name": "MALTA_PARAM_FIO_RUNTIME_SECONDS",
+              "value": "{{workflow.parameters.fio_runtime_seconds}}"
+            },
+            {
+              "name": "MALTA_CONTEXT",
+              "value": "{{workflow.parameters.malta_context}}"
+            },
+            {
+              "name": "WORKFLOW_NAME",
+              "value": "{{workflow.name}}"
+            },
+            {
+              "name": "WORKFLOW_UID",
+              "value": "{{workflow.uid}}"
+            },
+            {
+              "name": "ARGO_NODE_ID",
+              "valueFrom": {
+                "fieldRef": {
+                  "fieldPath": "metadata.annotations['workflows.argoproj.io/node-id']"
+                }
+              }
+            },
+            {
+              "name": "RESULTS_ROOT",
+              "value": "/results"
+            },
+            {
+              "name": "BENCH_ROOT",
+              "value": "/bench"
+            },
+            {
+              "name": "MALTA_INPUT_PATH",
+              "value": "{{inputs.parameters.input-path}}"
+            }
+          ],
+          "volumeMounts": [
+            {
+              "name": "results",
+              "mountPath": "/results"
+            },
+            {
+              "name": "scratch",
+              "mountPath": "/tmp"
+            },
+            {
+              "name": "benchmark",
+              "mountPath": "/bench",
+              "readOnly": true
+            }
+          ],
+          "resources": {
+            "requests": {
+              "cpu": "1",
+              "memory": "512Mi"
+            },
+            "limits": {
+              "cpu": "2",
+              "memory": "1Gi"
+            }
+          },
+          "securityContext": {
+            "allowPrivilegeEscalation": false,
+            "readOnlyRootFilesystem": true,
+            "capabilities": {
+              "drop": [
+                "ALL"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}
