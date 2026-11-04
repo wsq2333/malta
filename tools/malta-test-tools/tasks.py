@@ -15,7 +15,7 @@ import tempfile
 import time
 from urllib.parse import urlsplit
 
-VERSION = '0.2.0'
+VERSION = '0.2.1'
 PARAMETER_DIR = Path('/tmp')
 DEFAULTS = {
     'file_size_bytes': 4194304, 'file_count': 256,
@@ -297,7 +297,22 @@ class Task:
         self.evidence('fio-3.33', {'warmup_completed': True, 'dataset_sizes_verified': True}, [report, config])
 
 
+def native_crc64_backend():
+    # crcmod silently falls back to Python when its optional C build fails.
+    # Reject that fallback before upload rather than exhausting a large DAG budget.
+    import importlib
+    try:
+        implementation = importlib.import_module('crcmod.crcmod')
+        native = importlib.import_module('crcmod._crcfunext')
+    except ImportError:
+        raise TaskError('native crcmod extension required; rebuild test-tools dependencies') from None
+    require(implementation._usingExtension and implementation._crcfun is native,
+            'native crcmod extension required; rebuild test-tools dependencies')
+    return 'native'
+
+
 def oss_bucket():
+    native_crc64_backend()
     import oss2
     endpoint = os.environ.get('OSS_ENDPOINT', '')
     u = urlsplit(endpoint)
@@ -313,19 +328,20 @@ def oss_bucket():
     key, secret, token = (os.environ.get(k, '') for k in ('OSS_ACCESS_KEY_ID', 'OSS_ACCESS_KEY_SECRET', 'OSS_SESSION_TOKEN'))
     require(key and secret, 'OSS credentials missing')
     auth = oss2.StsAuth(key, secret, token) if token else oss2.Auth(key, secret)
-    return oss2.Bucket(auth, endpoint, bucket, connect_timeout=30, is_path_style=loopback)
+    return oss2.Bucket(auth, endpoint, bucket, connect_timeout=30, is_path_style=loopback, enable_crc=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['upload', 'warmup', 'fio-read', 'version'])
     args = parser.parse_args()
-    if args.action == 'version':
-        import oss2
-        print(json.dumps({'tool': 'malta-test-tools', 'version': VERSION, 'oss_sdk': oss2.__version__,
-                          'fio': subprocess.check_output(['/usr/bin/fio', '--version'], text=True).strip()}))
-        return 0
     try:
+        if args.action == 'version':
+            import oss2
+            print(json.dumps({'tool': 'malta-test-tools', 'version': VERSION, 'oss_sdk': oss2.__version__,
+                              'crc64_backend': native_crc64_backend(),
+                              'fio': subprocess.check_output(['/usr/bin/fio', '--version'], text=True).strip()}))
+            return 0
         task = Task(args.action)
         {'upload': task.upload, 'warmup': task.warmup, 'fio-read': task.read}[args.action]()
         task.publish_parameters()

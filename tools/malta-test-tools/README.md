@@ -47,6 +47,10 @@ docker build -f build/docker/Dockerfile.test-tools \
 docker run --rm malta-test-tools:<source-version> version
 ```
 
+依赖准备须在与运行镜像兼容的 **Debian bookworm、Linux/amd64、Python 3.11** 构建环境执行，并安装 `build-essential`、`python3-dev` 和 `python3-pip`（推荐使用 venv）。`prepare_dependencies.py` 强制从源码构建 `crcmod==1.7`，禁用其 wheel 缓存，并验证原生扩展确实加载；缺少编译器或头文件导致的纯 Python 回退会使准备失败。编译工具只留在构建环境，不复制进运行镜像。
+
+镜像构建会以 UID/GID 10001 执行 `malta-test-tools version`，预期包含 `"crc64_backend": "native"`。上传入口再次检查原生扩展并显式保留 OSS SDK 的 CRC64 校验；不会通过关闭 CRC 来提速。`dependencies.json` 同时记录原生后端、Python 版本和扩展文件摘要。原生 CRC 的计算速度不代表真实 OSS 上传吞吐，实际速度仍取决于网络、服务响应和其他处理开销。
+
 生产镜像仅包含运行脚本、锁定 SDK 依赖、许可证和 OS 工具；没有测试代码与配置。开发机无 Docker daemon 时，可按相同文件清单生成 OCI layout / Docker archive，并验证每层摘要及最终 rootfs；这不等价于在真实 Kubernetes 集群验收。
 
-`tests/test_tasks.py` 使用真实 OSS SDK、模拟 loopback OSS 和真实 fio，覆盖条件上传重用、三阶段数据衔接、报告摘要、Argo 身份/输出路径、错误脱敏及数据缺失。测试只能对临时目录运行，结果不是 Curvine 性能基线。
+`tests/test_tasks.py` 使用真实 OSS SDK、模拟 loopback OSS 和真实 fio，覆盖条件上传重用、三阶段数据衔接、报告摘要、Argo 身份/输出路径、错误脱敏、数据缺失、原生/纯 Python CRC 结果一致性、原生扩展缺失阻断，以及错误 OSS CRC 响应拒绝。测试只能对临时目录运行，结果不是 Curvine 性能基线。

@@ -8,5 +8,6 @@ COPY --chmod=755 tools/malta-test-tools/malta-test-tools /usr/local/bin/malta-te
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /usr/share/doc/malta-test-tools/
 ENV PYTHONPATH=/opt/malta-test-tools/deps PYTHONDONTWRITEBYTECODE=1
 USER 10001:10001
+RUN /usr/local/bin/malta-test-tools version
 ENTRYPOINT ["/usr/local/bin/malta-test-tools"]
 CMD ["version"]

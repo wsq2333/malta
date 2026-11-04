@@ -2,6 +2,7 @@ import contextlib
 import copy
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import importlib
 import importlib.util
 import io
 import json
@@ -35,6 +36,29 @@ class Parameters(unittest.TestCase):
                 with self.assertRaises(t.TaskError): t.safe_path(root, p)
 
 
+class NativeCRC(unittest.TestCase):
+    def test_native_matches_python_reference(self):
+        from oss2.utils import Crc64
+        self.assertEqual(t.native_crc64_backend(), 'native')
+        implementation = importlib.import_module('crcmod.crcmod')
+        fallback = importlib.import_module('crcmod._crcfunpy')
+        data = bytes(range(256)) * 4096
+        native = Crc64(); native(data)
+        with patch.object(implementation, '_usingExtension', False), \
+             patch.dict(implementation._sizeMap, {64: [fallback._crc64, fallback._crc64r]}):
+            reference = Crc64(); reference(data)
+        self.assertEqual(native.crc, reference.crc)
+
+    def test_python_fallback_rejected_before_upload(self):
+        implementation = importlib.import_module('crcmod.crcmod')
+        with patch.object(implementation, '_usingExtension', False):
+            with self.assertRaisesRegex(t.TaskError, 'native crcmod'):
+                t.oss_bucket()
+            with patch('sys.argv', ['tasks.py', 'version']), contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(t.main(), 1)
+            self.assertEqual(json.loads(out.getvalue())['status'], 'failed')
+
+
 class Pipeline(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='tools-validation-')
@@ -43,6 +67,7 @@ class Pipeline(unittest.TestCase):
         self.bench = self.root / 'bench'; self.bench.mkdir()
         self.objects = {}
         self.puts = 0
+        self.corrupt_crc = False
         owner = self
         class OSS(BaseHTTPRequestHandler):
             def log_message(self, *args): pass
@@ -60,7 +85,11 @@ class Pipeline(unittest.TestCase):
                 owner.puts += 1
                 owner.objects[key] = (body, {k.lower(): v for k, v in self.headers.items() if k.lower().startswith('x-oss-meta-')})
                 target = owner.bench / key;target.parent.mkdir(parents=True, exist_ok=True);target.write_bytes(body)
-                self.send_response(200);self.send_header('ETag', hashlib.md5(body).hexdigest());self.send_header('Content-Length', '0');self.end_headers()
+                from oss2.utils import Crc64
+                crc = Crc64(); crc(body)
+                self.send_response(200);self.send_header('ETag', hashlib.md5(body).hexdigest())
+                self.send_header('x-oss-hash-crc64ecma', str(crc.crc ^ (1 if owner.corrupt_crc else 0)))
+                self.send_header('Content-Length', '0');self.end_headers()
             def do_HEAD(self):
                 key = self.key()
                 if key not in owner.objects:self.send_response(404);self.end_headers();return
@@ -141,6 +170,13 @@ class Pipeline(unittest.TestCase):
         next(self.bench.rglob('*.bin')).unlink()
         warmup, paths = self.task('warmup', up[0])
         with self.assertRaises(t.TaskError):warmup.warmup()
+        self.assertFalse(paths[-1].exists())
+
+    def test_corrupt_crc_rejected_without_success_evidence(self):
+        self.corrupt_crc = True
+        upload, paths = self.task('upload')
+        with self.assertRaisesRegex(t.TaskError, 'OSS upload failed'):
+            upload.upload()
         self.assertFalse(paths[-1].exists())
 
     def test_sdk_errors_do_not_leak_credentials(self):
